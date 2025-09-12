@@ -1,125 +1,130 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  Card,
-  Select,
-  DatePicker,
-  Table,
-  Button,
-  Tag,
-  Typography,
-  Space,
-  message,
   Modal,
+  Table,
+  Switch,
   Input,
+  Button,
+  message,
+  Space,
+  Avatar,
+  Typography,
+  Drawer,
+  List,
+  Tag,
+  Skeleton,
 } from "antd";
-import {
-  CalendarOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  SaveOutlined,
-  LinkOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
-import {
-  useGetMyClubsQuery,
-  useMarkAttendanceMutation,
-  useAddTelegramPostMutation,
-} from "../store/api/tutorApi";
-import AttendanceModal from "../components/AttendanceModal";
-import LoadingSpinner from "../components/LoadingSpinner";
-import dayjs from "dayjs";
+import { UserOutlined, SaveOutlined, SearchOutlined } from "@ant-design/icons";
+import { useMarkAttendanceMutation } from "../store/api/tutorApi";
+import { useGetClubStudentsQuery } from "../store/api/clubApi";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
+const { TextArea } = Input;
 
-export default function Attendance() {
-  const [selectedClub, setSelectedClub] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(dayjs());
-  const [attendanceModal, setAttendanceModal] = useState(false);
-  const [telegramModal, setTelegramModal] = useState({
-    visible: false,
-    id: null,
-  });
-  const [telegramLink, setTelegramLink] = useState("");
-
-  const { data: clubsData, isLoading: clubsLoading } = useGetMyClubsQuery();
+export default function AttendanceModal({ visible, onClose, club, date }) {
+  const [students, setStudents] = useState([]);
+  const [notes, setNotes] = useState("");
+  const [searchText, setSearchText] = useState("");
   const [markAttendance, { isLoading: marking }] = useMarkAttendanceMutation();
-  const [addTelegramPost] = useAddTelegramPostMutation();
 
-  const clubs = clubsData?.data || [];
+  // Fetch real students data
+  const { data: studentsData, isLoading: studentsLoading } =
+    useGetClubStudentsQuery(club?._id, { skip: !club?._id });
 
-  // Mock attendance data
-  const attendanceData = [
-    {
-      _id: "1",
-      date: "2024-12-20",
-      students: [
-        {
-          student: { full_name: "Aliyev Jasur", student_id_number: "123456" },
+  const isMobile = window.innerWidth < 768;
+
+  useEffect(() => {
+    if (studentsData?.data) {
+      // Initialize attendance data with real students
+      setStudents(
+        studentsData.data.map((student) => ({
+          _id: student._id,
+          full_name: student.full_name,
+          student_id_number: student.student_id_number,
+          group: student.group,
+          department: student.department,
+          image: student.image,
           present: true,
-        },
-        {
-          student: {
-            full_name: "Karimova Dilnoza",
-            student_id_number: "123457",
-          },
-          present: true,
-        },
-        {
-          student: {
-            full_name: "Rashidov Azizbek",
-            student_id_number: "123458",
-          },
-          present: false,
-          reason: "Kasal",
-        },
-      ],
-      telegramPostLink: "https://t.me/channel/123",
-    },
-  ];
-
-  const handleMarkAttendance = () => {
-    if (!selectedClub) {
-      message.warning("Avval to'garakni tanlang");
-      return;
+          reason: "",
+        }))
+      );
     }
-    setAttendanceModal(true);
+  }, [studentsData]);
+
+  const handlePresenceChange = (studentId, present) => {
+    setStudents((prev) =>
+      prev.map((s) =>
+        s._id === studentId
+          ? { ...s, present, reason: present ? "" : s.reason }
+          : s
+      )
+    );
   };
 
-  const handleAddTelegramLink = async () => {
-    if (!telegramLink.trim()) {
-      message.warning("Telegram linkini kiriting");
-      return;
-    }
+  const handleReasonChange = (studentId, reason) => {
+    setStudents((prev) =>
+      prev.map((s) => (s._id === studentId ? { ...s, reason } : s))
+    );
+  };
 
+  const handleSubmit = async () => {
     try {
-      await addTelegramPost({
-        id: telegramModal.id,
-        telegramPostLink: telegramLink,
-      }).unwrap();
+      const attendanceData = {
+        clubId: club._id,
+        date: date.format("YYYY-MM-DD"),
+        students: students.map((s) => ({
+          student: s._id,
+          present: s.present,
+          reason: s.reason,
+        })),
+        notes,
+      };
 
-      message.success("Telegram linki qo'shildi");
-      setTelegramModal({ visible: false, id: null });
-      setTelegramLink("");
+      await markAttendance(attendanceData).unwrap();
+      message.success("Davomat muvaffaqiyatli saqlandi");
+      onClose();
+      setNotes("");
+      setSearchText("");
     } catch (error) {
       message.error("Xatolik yuz berdi");
     }
   };
 
+  const filteredStudents = students.filter(
+    (s) =>
+      s.full_name.toLowerCase().includes(searchText.toLowerCase()) ||
+      s.student_id_number.includes(searchText)
+  );
+
+  const presentCount = students.filter((s) => s.present).length;
+  const absentCount = students.length - presentCount;
+  const percentage =
+    students.length > 0
+      ? ((presentCount / students.length) * 100).toFixed(1)
+      : 0;
+
+  // Desktop table columns
   const columns = [
     {
-      title: "Sana",
-      dataIndex: "date",
-      key: "date",
-      render: (date) => (
-        <div className="flex items-center gap-2">
-          <CalendarOutlined className="text-purple-500" />
+      title: "Student",
+      key: "student",
+      render: (_, record) => (
+        <div className="flex items-center gap-3">
+          <Avatar
+            src={record.image}
+            icon={!record.image && <UserOutlined />}
+            className="bg-purple-500"
+          />
           <div>
-            <Text className="font-medium">
-              {dayjs(date).format("DD.MM.YYYY")}
-            </Text>
+            <Text className="font-medium">{record.full_name}</Text>
             <Text className="block text-xs text-gray-500">
-              {dayjs(date).format("dddd")}
+              {record.student_id_number}
             </Text>
+            {record.group && (
+              <Text className="block text-xs text-gray-400">
+                {record.group.name}
+              </Text>
+            )}
           </div>
         </div>
       ),
@@ -127,163 +132,183 @@ export default function Attendance() {
     {
       title: "Davomat",
       key: "attendance",
-      render: (_, record) => {
-        const total = record.students?.length || 0;
-        const present = record.students?.filter((s) => s.present).length || 0;
-        const absent = total - present;
-        const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : 0;
-
-        return (
-          <div className="space-y-2">
-            <div className="flex gap-4">
-              <Tag icon={<CheckCircleOutlined />} color="success">
-                Kelgan: {present}
-              </Tag>
-              <Tag icon={<CloseCircleOutlined />} color="error">
-                Kelmagan: {absent}
-              </Tag>
-            </div>
-            <Text className="text-sm">Davomat: {percentage}%</Text>
-          </div>
-        );
-      },
-    },
-    {
-      title: "Studentlar",
-      key: "students",
+      width: 120,
       render: (_, record) => (
-        <div className="space-y-1">
-          {record.students?.slice(0, 3).map((s, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  s.present ? "bg-green-500" : "bg-red-500"
-                }`}
-              />
-              <Text className="text-sm">{s.student.full_name}</Text>
-              {s.reason && (
-                <Tag color="orange" className="text-xs">
-                  {s.reason}
-                </Tag>
-              )}
-            </div>
-          ))}
-          {record.students?.length > 3 && (
-            <Text className="text-xs text-gray-500">
-              +{record.students.length - 3} ta
-            </Text>
-          )}
-        </div>
+        <Switch
+          checked={record.present}
+          onChange={(checked) => handlePresenceChange(record._id, checked)}
+          checkedChildren="Keldi"
+          unCheckedChildren="Kelmadi"
+        />
       ),
     },
     {
-      title: "Telegram",
-      dataIndex: "telegramPostLink",
-      key: "telegram",
-      render: (link, record) =>
-        link ? (
-          <a href={link} target="_blank" rel="noopener noreferrer">
-            <Button type="link" icon={<LinkOutlined />}>
-              Post ko'rish
-            </Button>
-          </a>
-        ) : (
-          <Button
-            size="small"
-            icon={<PlusOutlined />}
-            onClick={() => setTelegramModal({ visible: true, id: record._id })}
-          >
-            Link qo'shish
-          </Button>
-        ),
+      title: "Kelmagan sababi",
+      key: "reason",
+      render: (_, record) => (
+        <Input
+          placeholder="Sabab kiriting..."
+          value={record.reason}
+          onChange={(e) => handleReasonChange(record._id, e.target.value)}
+          disabled={record.present}
+        />
+      ),
     },
   ];
 
-  if (clubsLoading) return <LoadingSpinner size="large" />;
+  // Mobile list item
+  const MobileStudentItem = ({ student }) => (
+    <List.Item className="border-b py-3">
+      <div className="w-full space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1">
+            <Avatar
+              src={student.image}
+              icon={!student.image && <UserOutlined />}
+              className="bg-purple-500"
+              size="large"
+            />
+            <div className="flex-1">
+              <Text className="font-medium block">{student.full_name}</Text>
+              <Text className="text-xs text-gray-500">
+                {student.student_id_number}
+              </Text>
+              {student.group && (
+                <Tag size="small" color="blue" className="mt-1">
+                  {student.group.name}
+                </Tag>
+              )}
+            </div>
+          </div>
+          <Switch
+            checked={student.present}
+            onChange={(checked) => handlePresenceChange(student._id, checked)}
+            checkedChildren="Keldi"
+            unCheckedChildren="Yo'q"
+          />
+        </div>
+        {!student.present && (
+          <Input
+            placeholder="Kelmagan sababi..."
+            value={student.reason}
+            onChange={(e) => handleReasonChange(student._id, e.target.value)}
+            size="small"
+          />
+        )}
+      </div>
+    </List.Item>
+  );
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <Title level={3}>Davomat</Title>
-
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleMarkAttendance}
-          size="large"
-          className="bg-gradient-to-r from-purple-500 to-pink-600 border-0"
-        >
-          Davomat kiritish
-        </Button>
+  const content = (
+    <>
+      <div className="mb-4">
+        <Input
+          placeholder="Student qidirish..."
+          prefix={<SearchOutlined />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="mb-4"
+        />
       </div>
 
-      <Card className="border-0 shadow-md">
-        <div className="flex gap-4 mb-6">
-          <Select
-            placeholder="To'garakni tanlang"
-            style={{ width: 250 }}
-            value={selectedClub}
-            onChange={setSelectedClub}
-          >
-            {clubs.map((club) => (
-              <Select.Option key={club._id} value={club._id}>
-                {club.name}
-              </Select.Option>
-            ))}
-          </Select>
+      {studentsLoading ? (
+        <Skeleton active paragraph={{ rows: 5 }} />
+      ) : isMobile ? (
+        <List
+          dataSource={filteredStudents}
+          renderItem={(student) => <MobileStudentItem student={student} />}
+          className="max-h-96 overflow-y-auto"
+        />
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={filteredStudents}
+          rowKey="_id"
+          pagination={false}
+          size="small"
+          scroll={{ y: 400 }}
+        />
+      )}
 
-          <DatePicker
-            value={selectedDate}
-            onChange={setSelectedDate}
-            format="DD.MM.YYYY"
-            style={{ width: 150 }}
+      <div className="mt-4 space-y-4">
+        <div>
+          <Text className="block mb-2">Qo'shimcha izoh:</Text>
+          <TextArea
+            placeholder="Dars haqida izoh yoki eslatma..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
           />
         </div>
 
-        {selectedClub ? (
-          <Table
-            columns={columns}
-            dataSource={attendanceData}
-            rowKey="_id"
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showTotal: (total) => `Jami: ${total} ta`,
-            }}
-          />
-        ) : (
-          <div className="text-center py-12 text-gray-500">
-            <CalendarOutlined className="text-4xl mb-4 text-gray-300" />
-            <Text>To'garakni tanlang</Text>
-          </div>
-        )}
-      </Card>
+        <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg">
+          <Tag color="green" className="m-0">
+            Kelgan: <span className="font-bold">{presentCount}</span>
+          </Tag>
+          <Tag color="red" className="m-0">
+            Kelmagan: <span className="font-bold">{absentCount}</span>
+          </Tag>
+          <Tag color="blue" className="m-0">
+            Davomat: <span className="font-bold">{percentage}%</span>
+          </Tag>
+        </div>
+      </div>
+    </>
+  );
 
-      <AttendanceModal
-        visible={attendanceModal}
-        onClose={() => setAttendanceModal(false)}
-        club={clubs.find((c) => c._id === selectedClub)}
-        date={selectedDate}
-      />
-
-      <Modal
-        title="Telegram post linki"
-        open={telegramModal.visible}
-        onCancel={() => {
-          setTelegramModal({ visible: false, id: null });
-          setTelegramLink("");
-        }}
-        onOk={handleAddTelegramLink}
-        okText="Qo'shish"
-        cancelText="Bekor qilish"
+  const footer = (
+    <div className="flex justify-end gap-2">
+      <Button onClick={onClose}>Bekor qilish</Button>
+      <Button
+        type="primary"
+        icon={<SaveOutlined />}
+        onClick={handleSubmit}
+        loading={marking}
+        className="bg-gradient-to-r from-purple-500 to-pink-600 border-0"
       >
-        <Input
-          placeholder="https://t.me/channel/..."
-          value={telegramLink}
-          onChange={(e) => setTelegramLink(e.target.value)}
-          prefix={<LinkOutlined />}
-        />
-      </Modal>
+        Saqlash
+      </Button>
     </div>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer
+        title={
+          <div>
+            <Text className="text-lg font-medium">Davomat kiritish</Text>
+            <div className="text-sm text-gray-500 mt-1">
+              {club?.name} - {date?.format("DD.MM.YYYY")}
+            </div>
+          </div>
+        }
+        placement="bottom"
+        open={visible}
+        onClose={onClose}
+        height="90%"
+        footer={footer}
+      >
+        {content}
+      </Drawer>
+    );
+  }
+
+  return (
+    <Modal
+      title={
+        <div>
+          <Text className="text-lg font-medium">Davomat kiritish</Text>
+          <div className="text-sm text-gray-500 mt-1">
+            {club?.name} - {date?.format("DD.MM.YYYY")}
+          </div>
+        </div>
+      }
+      open={visible}
+      onCancel={onClose}
+      width={800}
+      footer={footer}
+    >
+      {content}
+    </Modal>
   );
 }

@@ -6,8 +6,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import MyClubs from "./pages/MyClubs";
 import Applications from "./pages/Applications";
-import Attendance from "./pages/Attendance";
 import Students from "./pages/Students";
+import Attendance from "./pages/Attendance";
 import Profile from "./pages/Profile";
 
 function App() {
