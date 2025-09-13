@@ -173,15 +173,6 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           fontSize: collapsed ? "20px" : "14px",
         }}
       />
-
-      {!collapsed && (
-        <div className="absolute bottom-4 left-0 right-0 px-4">
-          <div className="bg-purple-800/50 rounded-lg p-3 text-white text-center">
-            <div className="text-xs opacity-80">Versiya</div>
-            <div className="font-semibold">1.0.0</div>
-          </div>
-        </div>
-      )}
     </Sider>
   );
 }

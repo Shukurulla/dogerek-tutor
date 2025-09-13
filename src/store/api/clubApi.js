@@ -19,8 +19,10 @@ export const clubApi = baseApi.injectEndpoints({
 
     // Get club students
     getClubStudents: builder.query({
-      query: (id, status = "active") =>
-        `/clubs/${id}/students?status=${status}`,
+      query: (id, status = "active") => ({
+        url: `/clubs/${id}/students`,
+        params: { status },
+      }),
       providesTags: (result, error, id) => [
         { type: "Club", id: `students-${id}` },
       ],
@@ -132,6 +134,78 @@ export const clubApi = baseApi.injectEndpoints({
         { type: "Club", id: `announcements-${clubId}` },
       ],
     }),
+
+    // Get club details for tutor
+    getClubDetails: builder.query({
+      query: (clubId) => `/clubs/${clubId}`,
+      providesTags: (result, error, clubId) => [{ type: "Club", id: clubId }],
+    }),
+
+    // Get club enrollment requests
+    getClubEnrollmentRequests: builder.query({
+      query: (clubId) => `/clubs/${clubId}/enrollment-requests`,
+      providesTags: (result, error, clubId) => [
+        { type: "Club", id: `requests-${clubId}` },
+      ],
+    }),
+
+    // Process enrollment request
+    processEnrollmentRequest: builder.mutation({
+      query: ({ clubId, studentId, action, reason }) => ({
+        url: `/clubs/${clubId}/enrollment-requests/${studentId}`,
+        method: "POST",
+        body: { action, reason },
+      }),
+      invalidatesTags: (result, error, { clubId }) => [
+        { type: "Club", id: `requests-${clubId}` },
+        { type: "Club", id: `students-${clubId}` },
+        "Application",
+      ],
+    }),
+
+    // Get club attendance summary
+    getClubAttendanceSummary: builder.query({
+      query: ({ clubId, period = "month" }) => ({
+        url: `/clubs/${clubId}/attendance-summary`,
+        params: { period },
+      }),
+      providesTags: (result, error, { clubId }) => [
+        { type: "Club", id: `attendance-summary-${clubId}` },
+      ],
+    }),
+
+    // Export club student list
+    exportClubStudents: builder.mutation({
+      query: ({ clubId, format = "xlsx" }) => ({
+        url: `/clubs/${clubId}/export-students`,
+        method: "POST",
+        body: { format },
+        responseHandler: (response) => response.blob(),
+      }),
+    }),
+
+    // Get club performance metrics
+    getClubPerformanceMetrics: builder.query({
+      query: ({ clubId, startDate, endDate }) => ({
+        url: `/clubs/${clubId}/performance`,
+        params: { startDate, endDate },
+      }),
+      providesTags: (result, error, { clubId }) => [
+        { type: "Club", id: `performance-${clubId}` },
+      ],
+    }),
+
+    // Update club settings (for tutors)
+    updateClubSettings: builder.mutation({
+      query: ({ clubId, ...settings }) => ({
+        url: `/tutor/club/${clubId}/settings`,
+        method: "PUT",
+        body: settings,
+      }),
+      invalidatesTags: (result, error, { clubId }) => [
+        { type: "Club", id: clubId },
+      ],
+    }),
   }),
 });
 
@@ -151,4 +225,11 @@ export const {
   useGetRecommendedClubsQuery,
   useGetClubAnnouncementsQuery,
   useAddClubAnnouncementMutation,
+  useGetClubDetailsQuery,
+  useGetClubEnrollmentRequestsQuery,
+  useProcessEnrollmentRequestMutation,
+  useGetClubAttendanceSummaryQuery,
+  useExportClubStudentsMutation,
+  useGetClubPerformanceMetricsQuery,
+  useUpdateClubSettingsMutation,
 } = clubApi;

@@ -11,6 +11,7 @@ import {
   Empty,
   Button,
   Skeleton,
+  Alert,
 } from "antd";
 import {
   BookOutlined,
@@ -21,6 +22,7 @@ import {
   ClockCircleOutlined,
   TrophyOutlined,
   UserOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import {
   BarChart,
@@ -40,11 +42,10 @@ import {
   useGetTutorDashboardQuery,
   useGetMyClubsQuery,
   useGetApplicationsQuery,
+  useGetAttendanceStatisticsQuery,
 } from "../store/api/tutorApi";
-import { useGetAttendanceStatisticsQuery } from "../store/api/attendanceApi";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useNavigate } from "react-router-dom";
-import { formatDate, calculateAttendancePercentage } from "../utils/helpers";
 import dayjs from "dayjs";
 import React from "react";
 
@@ -52,35 +53,58 @@ const { Title, Text } = Typography;
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { data: dashboardData, isLoading: dashboardLoading } =
-    useGetTutorDashboardQuery();
+
+  // Real API chaqiriqlari
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+  } = useGetTutorDashboardQuery();
   const { data: clubsData, isLoading: clubsLoading } = useGetMyClubsQuery();
-  const { data: applicationsData } = useGetApplicationsQuery("pending");
-  const { data: attendanceStats } = useGetAttendanceStatisticsQuery({
-    startDate: dayjs().startOf("month").format("YYYY-MM-DD"),
-    endDate: dayjs().endOf("month").format("YYYY-MM-DD"),
-    groupBy: "day",
-  });
+  const { data: applicationsData, isLoading: applicationsLoading } =
+    useGetApplicationsQuery("pending");
+  const { data: attendanceStats, isLoading: statsLoading } =
+    useGetAttendanceStatisticsQuery({
+      startDate: dayjs().startOf("month").format("YYYY-MM-DD"),
+      endDate: dayjs().endOf("month").format("YYYY-MM-DD"),
+      groupBy: "day",
+    });
 
   if (dashboardLoading) return <LoadingSpinner size="large" />;
+
+  // Error handling
+  if (dashboardError) {
+    return (
+      <div className="p-6">
+        <Alert
+          message="Xatolik"
+          description="Dashboard ma'lumotlarini yuklab bo'lmadi. Sahifani yangilang."
+          type="error"
+          showIcon
+          icon={<ExclamationCircleOutlined />}
+          action={
+            <Button size="small" onClick={() => window.location.reload()}>
+              Yangilash
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   const stats = dashboardData?.data || {};
   const clubs = clubsData?.data || [];
   const pendingApplications = applicationsData?.data || [];
 
-  // Real attendance data for chart
-  const weekData = attendanceStats?.data || [
-    { day: "Du", davomat: 0 },
-    { day: "Se", davomat: 0 },
-    { day: "Ch", davomat: 0 },
-    { day: "Pa", davomat: 0 },
-    { day: "Ju", davomat: 0 },
-  ];
+  // Chart uchun haqiqiy ma'lumotlar
+  const weekData = attendanceStats?.data?.weeklyData || [];
+  const monthlyData = attendanceStats?.data?.monthlyData || [];
 
-  // Pie chart data for club distribution
-  const pieData = clubs.map((club) => ({
+  // Pie chart uchun real club ma'lumotlari
+  const pieData = clubs.map((club, index) => ({
     name: club.name,
     value: club.totalStudents || 0,
+    color: ["#722ed1", "#1890ff", "#52c41a", "#fa8c16", "#eb2f96"][index % 5],
   }));
 
   const COLORS = ["#722ed1", "#1890ff", "#52c41a", "#fa8c16", "#eb2f96"];
@@ -93,6 +117,7 @@ export default function Dashboard() {
     suffix,
     onClick,
     loading = false,
+    description,
   }) => (
     <Card
       className="card-hover border-0 shadow-md cursor-pointer h-full"
@@ -118,6 +143,9 @@ export default function Dashboard() {
                 }}
               />
             </div>
+            {description && (
+              <Text className="text-xs text-gray-400 mt-1">{description}</Text>
+            )}
           </div>
           <div
             className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center flex-shrink-0"
@@ -142,11 +170,7 @@ export default function Dashboard() {
           Dashboard
         </Title>
         <Text className="text-gray-500 text-sm">
-          Xush kelibsiz,{" "}
-          {stats.userName ||
-            dashboardData?.data?.user?.profile?.fullName ||
-            "Tutor"}
-          !
+          Xush kelibsiz, {stats.userName || "Tutor"}!
         </Text>
       </div>
 
@@ -160,6 +184,7 @@ export default function Dashboard() {
             suffix="ta"
             onClick={() => navigate("/my-clubs")}
             loading={clubsLoading}
+            description="Faol to'garaklar soni"
           />
         </Col>
 
@@ -171,6 +196,7 @@ export default function Dashboard() {
             color="#1890ff"
             suffix="ta"
             onClick={() => navigate("/students")}
+            description="Barcha to'garaklardagi studentlar"
           />
         </Col>
 
@@ -182,6 +208,8 @@ export default function Dashboard() {
             color="#fa8c16"
             suffix="ta"
             onClick={() => navigate("/applications")}
+            loading={applicationsLoading}
+            description="Yangi arizalar"
           />
         </Col>
 
@@ -193,6 +221,7 @@ export default function Dashboard() {
             color="#52c41a"
             suffix="ta"
             onClick={() => navigate("/attendance")}
+            description="Bugun rejalashtirilgan"
           />
         </Col>
       </Row>
@@ -205,13 +234,15 @@ export default function Dashboard() {
             }
             className="shadow-md border-0 h-full"
             extra={
-              <Button
-                type="link"
-                onClick={() => navigate("/my-clubs")}
-                size="small"
-              >
-                Barchasi
-              </Button>
+              clubs.length > 3 && (
+                <Button
+                  type="link"
+                  onClick={() => navigate("/my-clubs")}
+                  size="small"
+                >
+                  Barchasi
+                </Button>
+              )
             }
             bodyStyle={{ padding: "12px 16px" }}
           >
@@ -228,34 +259,33 @@ export default function Dashboard() {
                           {club.name}
                         </Text>
                         <Tag color="purple" className="ml-auto">
-                          {club.totalStudents ||
-                            club.enrolledStudents?.filter(
-                              (e) => e.status === "active"
-                            ).length ||
-                            0}{" "}
-                          ta
+                          {club.totalStudents || 0} ta
                         </Tag>
                       </div>
                       <Progress
                         percent={
-                          ((club.totalStudents ||
-                            club.enrolledStudents?.filter(
-                              (e) => e.status === "active"
-                            ).length ||
-                            0) /
-                            (club.capacity || 30)) *
-                          100
+                          club.capacity && club.totalStudents
+                            ? (club.totalStudents / club.capacity) * 100
+                            : 0
                         }
                         size="small"
                         strokeColor="#722ed1"
                         showInfo={false}
                       />
+                      {club.faculty && (
+                        <Text className="text-xs text-gray-500 mt-1 block">
+                          {club.faculty.name}
+                        </Text>
+                      )}
                     </div>
                   </List.Item>
                 )}
               />
             ) : (
-              <Empty description="To'garak mavjud emas" />
+              <Empty
+                description="To'garak mavjud emas"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
             )}
           </Card>
         </Col>
@@ -268,15 +298,32 @@ export default function Dashboard() {
             className="shadow-md border-0 h-full"
             bodyStyle={{ padding: "12px 16px" }}
           >
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={weekData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Bar dataKey="davomat" fill="#722ed1" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {statsLoading ? (
+              <Skeleton active paragraph={{ rows: 4 }} />
+            ) : weekData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={weekData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 12 }}
+                    axisLine={false}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} axisLine={false} />
+                  <Tooltip />
+                  <Bar
+                    dataKey="attendance"
+                    fill="#722ed1"
+                    radius={[8, 8, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Empty
+                description="Davomat ma'lumoti yo'q"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            )}
           </Card>
         </Col>
 
@@ -300,15 +347,16 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 sm:gap-3 w-full">
                       <Avatar
                         size={window.innerWidth < 640 ? "small" : "default"}
+                        src={item.student?.image}
                         className={`${
                           index === 0
                             ? "bg-yellow-500"
                             : index === 1
                             ? "bg-gray-400"
                             : "bg-orange-500"
-                        }`}
+                        } flex-shrink-0`}
                       >
-                        {index + 1}
+                        {!item.student?.image && index + 1}
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <Text className="font-medium block truncate text-sm sm:text-base">
@@ -326,13 +374,16 @@ export default function Dashboard() {
                 )}
               />
             ) : (
-              <Empty description="Ma'lumot mavjud emas" />
+              <Empty
+                description="Ma'lumot mavjud emas"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
             )}
           </Card>
         </Col>
       </Row>
 
-      {/* Mobile-optimized summary card */}
+      {/* Qo'shimcha statistikalar */}
       <Card
         className="shadow-md border-0 bg-gradient-to-r from-purple-50 to-pink-50"
         bodyStyle={{ padding: 0 }}
@@ -351,7 +402,7 @@ export default function Dashboard() {
           <div className="p-3 sm:p-6 text-center">
             <ClockCircleOutlined className="text-xl sm:text-3xl text-blue-500 mb-1 sm:mb-2" />
             <Text className="block text-gray-600 mb-1 text-xs sm:text-sm">
-              O'tkazilgan
+              O'tkazilgan darslar
             </Text>
             <Text className="text-lg sm:text-2xl font-bold">
               {stats.totalSessions || 0}
@@ -371,7 +422,7 @@ export default function Dashboard() {
           <div className="p-3 sm:p-6 text-center">
             <TeamOutlined className="text-xl sm:text-3xl text-purple-500 mb-1 sm:mb-2" />
             <Text className="block text-gray-600 mb-1 text-xs sm:text-sm">
-              O'rtacha
+              O'rtacha davomat
             </Text>
             <Text className="text-lg sm:text-2xl font-bold">
               {stats.averageAttendance || 0}%
@@ -380,56 +431,63 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      {/* Additional charts for desktop */}
-      <Row gutter={[12, 12]} className="hidden lg:flex px-2 sm:px-0">
-        <Col lg={12}>
-          <Card title="Studentlar taqsimoti" className="shadow-md border-0">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) =>
-                    `${name}: ${(percent * 100).toFixed(0)}%`
-                  }
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
+      {/* Desktop uchun qo'shimcha chartlar */}
+      {(pieData.length > 0 || monthlyData.length > 0) && (
+        <Row gutter={[12, 12]} className="hidden lg:flex px-2 sm:px-0">
+          {pieData.length > 0 && (
+            <Col lg={12}>
+              <Card title="Studentlar taqsimoti" className="shadow-md border-0">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+          )}
 
-        <Col lg={12}>
-          <Card title="Oylik tendensiya" className="shadow-md border-0">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={attendanceStats?.monthlyData || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="attendance"
-                  stroke="#722ed1"
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
-      </Row>
+          {monthlyData.length > 0 && (
+            <Col lg={pieData.length > 0 ? 12 : 24}>
+              <Card title="Oylik tendensiya" className="shadow-md border-0">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="attendance"
+                      stroke="#722ed1"
+                      strokeWidth={2}
+                      dot={{ fill: "#722ed1" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+            </Col>
+          )}
+        </Row>
+      )}
     </div>
   );
 }
