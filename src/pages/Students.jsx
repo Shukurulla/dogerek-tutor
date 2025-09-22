@@ -15,6 +15,10 @@ import {
   Skeleton,
   Empty,
   Statistic,
+  Modal,
+  message,
+  Popconfirm,
+  notification,
 } from "antd";
 import {
   SearchOutlined,
@@ -24,33 +28,78 @@ import {
   CheckCircleOutlined,
   TeamOutlined,
   FilterOutlined,
+  DeleteOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { useGetMyClubsQuery } from "../store/api/tutorApi";
-import { useGetClubStudentsQuery } from "../store/api/clubApi";
+import {
+  useGetClubStudentsQuery,
+  useRemoveStudentFromClubMutation,
+} from "../store/api/clubApi";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatPhoneNumber } from "../utils/helpers";
+import { useLocation } from "react-router-dom";
 
 const { Title, Text } = Typography;
 
 export default function Students() {
-  const [selectedClub, setSelectedClub] = useState(null);
+  const location = useLocation();
+  const [selectedClub, setSelectedClub] = useState(
+    location.state?.clubId || null
+  );
   const [searchText, setSearchText] = useState("");
   const [filterDrawerVisible, setFilterDrawerVisible] = useState(false);
   const isMobile = window.innerWidth < 768;
 
+  // Real API calls
   const { data: clubsData, isLoading: clubsLoading } = useGetMyClubsQuery();
-  const { data: studentsData, isLoading: studentsLoading } =
-    useGetClubStudentsQuery(selectedClub, { skip: !selectedClub });
+  const {
+    data: studentsData,
+    isLoading: studentsLoading,
+    refetch: refetchStudents,
+  } = useGetClubStudentsQuery(selectedClub, {
+    skip: !selectedClub,
+  });
+
+  const [removeStudentFromClub, { isLoading: removing }] =
+    useRemoveStudentFromClubMutation();
 
   const clubs = clubsData?.data || [];
   const students = studentsData?.data || [];
 
-  // Auto-select first club if available
+  // Auto-select first club
   useEffect(() => {
     if (clubs.length > 0 && !selectedClub) {
       setSelectedClub(clubs[0]._id);
     }
   }, [clubs, selectedClub]);
+
+  // Remove student from club
+  const handleRemoveStudent = async (student) => {
+    try {
+      const result = await removeStudentFromClub({
+        clubId: selectedClub,
+        studentId: student._id,
+      }).unwrap();
+
+      if (result.success) {
+        message.success(`${student.full_name} to'garakdan chiqarildi`);
+
+        // Send notification (this would be handled by backend in real app)
+        notification.info({
+          message: "Student xabardor qilindi",
+          description: `${student.full_name}ga to'garakdan chiqarilganligi haqida xabar yuborildi`,
+          placement: "topRight",
+          icon: <ExclamationCircleOutlined style={{ color: "#108ee9" }} />,
+        });
+
+        // Refetch students list
+        refetchStudents();
+      }
+    } catch (error) {
+      message.error(error?.data?.message || "Xatolik yuz berdi");
+    }
+  };
 
   const filteredStudents = students.filter(
     (s) =>
@@ -158,6 +207,25 @@ export default function Students() {
         return <Badge status={color} text={`${percentage}%`} />;
       },
     },
+    {
+      title: "Amal",
+      key: "action",
+      width: 100,
+      render: (_, record) => (
+        <Popconfirm
+          title="Studentni to'garakdan chiqarish"
+          description={`${record.full_name}ni to'garakdan chiqarishni tasdiqlaysizmi?`}
+          onConfirm={() => handleRemoveStudent(record)}
+          okText="Ha, chiqarish"
+          cancelText="Bekor qilish"
+          okButtonProps={{ danger: true, loading: removing }}
+        >
+          <Button type="text" danger icon={<DeleteOutlined />} size="small">
+            Chiqarish
+          </Button>
+        </Popconfirm>
+      ),
+    },
   ];
 
   // Mobile student card
@@ -199,24 +267,46 @@ export default function Students() {
         </div>
       </div>
 
-      {(student.phone || student.email) && (
-        <div className="mt-3 pt-3 border-t space-y-1">
-          {student.phone && (
-            <div className="flex items-center gap-2 text-gray-600">
-              <PhoneOutlined className="text-xs" />
-              <Text className="text-xs">
-                {formatPhoneNumber(student.phone)}
-              </Text>
-            </div>
-          )}
-          {student.email && (
-            <div className="flex items-center gap-2 text-gray-600">
-              <MailOutlined className="text-xs" />
-              <Text className="text-xs truncate">{student.email}</Text>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="mt-3 pt-3 border-t space-y-2">
+        {(student.phone || student.email) && (
+          <div className="space-y-1">
+            {student.phone && (
+              <div className="flex items-center gap-2 text-gray-600">
+                <PhoneOutlined className="text-xs" />
+                <Text className="text-xs">
+                  {formatPhoneNumber(student.phone)}
+                </Text>
+              </div>
+            )}
+            {student.email && (
+              <div className="flex items-center gap-2 text-gray-600">
+                <MailOutlined className="text-xs" />
+                <Text className="text-xs truncate">{student.email}</Text>
+              </div>
+            )}
+          </div>
+        )}
+
+        <Popconfirm
+          title="Studentni chiqarish"
+          description={`${student.full_name}ni to'garakdan chiqarishni tasdiqlaysizmi?`}
+          onConfirm={() => handleRemoveStudent(student)}
+          okText="Ha"
+          cancelText="Yo'q"
+          okButtonProps={{ danger: true, loading: removing }}
+        >
+          <Button
+            type="primary"
+            danger
+            icon={<DeleteOutlined />}
+            loading={removing}
+            size="small"
+            block
+          >
+            To'garakdan chiqarish
+          </Button>
+        </Popconfirm>
+      </div>
     </Card>
   );
 
@@ -242,12 +332,7 @@ export default function Students() {
           >
             {clubs.map((club) => (
               <Select.Option key={club._id} value={club._id}>
-                {club.name} (
-                {club.totalStudents ||
-                  club.enrolledStudents?.filter((e) => e.status === "active")
-                    .length ||
-                  0}{" "}
-                ta)
+                {club.name} ({club.totalStudents || 0} ta)
               </Select.Option>
             ))}
           </Select>
@@ -300,12 +385,7 @@ export default function Students() {
             >
               {clubs.map((club) => (
                 <Select.Option key={club._id} value={club._id}>
-                  {club.name} (
-                  {club.totalStudents ||
-                    club.enrolledStudents?.filter((e) => e.status === "active")
-                      .length ||
-                    0}{" "}
-                  ta)
+                  {club.name} ({club.totalStudents || 0} ta)
                 </Select.Option>
               ))}
             </Select>
@@ -329,16 +409,11 @@ export default function Students() {
                 className="border border-purple-200 bg-purple-50"
                 bodyStyle={{ padding: "12px sm:padding" }}
               >
-                <div className="text-center sm:flex sm:items-center sm:justify-between">
-                  <div className="sm:text-left">
-                    <Text className="text-gray-600 text-xs sm:text-sm">
-                      Jami
-                    </Text>
-                    <div className="text-xl sm:text-2xl font-bold text-purple-600 mt-1">
-                      {statistics.total}
-                    </div>
+                <div className="text-center">
+                  <Text className="text-gray-600 text-xs sm:text-sm">Jami</Text>
+                  <div className="text-xl sm:text-2xl font-bold text-purple-600 mt-1">
+                    {statistics.total}
                   </div>
-                  <TeamOutlined className="hidden sm:block text-2xl sm:text-3xl text-purple-400" />
                 </div>
               </Card>
 
@@ -346,16 +421,13 @@ export default function Students() {
                 className="border border-green-200 bg-green-50"
                 bodyStyle={{ padding: "12px sm:padding" }}
               >
-                <div className="text-center sm:flex sm:items-center sm:justify-between">
-                  <div className="sm:text-left">
-                    <Text className="text-gray-600 text-xs sm:text-sm">
-                      O'rtacha
-                    </Text>
-                    <div className="text-xl sm:text-2xl font-bold text-green-600 mt-1">
-                      {statistics.averageAttendance}%
-                    </div>
+                <div className="text-center">
+                  <Text className="text-gray-600 text-xs sm:text-sm">
+                    O'rtacha
+                  </Text>
+                  <div className="text-xl sm:text-2xl font-bold text-green-600 mt-1">
+                    {statistics.averageAttendance}%
                   </div>
-                  <CheckCircleOutlined className="hidden sm:block text-2xl sm:text-3xl text-green-400" />
                 </div>
               </Card>
 
@@ -363,16 +435,11 @@ export default function Students() {
                 className="border border-blue-200 bg-blue-50"
                 bodyStyle={{ padding: "12px sm:padding" }}
               >
-                <div className="text-center sm:flex sm:items-center sm:justify-between">
-                  <div className="sm:text-left">
-                    <Text className="text-gray-600 text-xs sm:text-sm">
-                      Faol
-                    </Text>
-                    <div className="text-xl sm:text-2xl font-bold text-blue-600 mt-1">
-                      {statistics.activeCount}
-                    </div>
+                <div className="text-center">
+                  <Text className="text-gray-600 text-xs sm:text-sm">Faol</Text>
+                  <div className="text-xl sm:text-2xl font-bold text-blue-600 mt-1">
+                    {statistics.activeCount}
                   </div>
-                  <UserOutlined className="hidden sm:block text-2xl sm:text-3xl text-blue-400" />
                 </div>
               </Card>
             </div>

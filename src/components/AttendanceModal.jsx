@@ -15,6 +15,7 @@ import {
   Skeleton,
   Empty,
   Alert,
+  Card,
 } from "antd";
 import {
   UserOutlined,
@@ -119,6 +120,14 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
       return;
     }
 
+    // Check if attendance already exists (without the ability to edit)
+    if (existingAttendance?.data && !existingAttendance?.data?.canEdit) {
+      message.error(
+        "Bu sana uchun davomat allaqachon kiritilgan va o'zgartirib bo'lmaydi"
+      );
+      return;
+    }
+
     try {
       const attendanceData = {
         clubId: club._id,
@@ -160,6 +169,51 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
     students.length > 0
       ? ((presentCount / students.length) * 100).toFixed(1)
       : 0;
+
+  // Mobile student card component
+  const MobileStudentCard = ({ student }) => (
+    <Card className="mb-3 shadow-sm" bodyStyle={{ padding: "12px" }}>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Avatar
+              src={student.image}
+              icon={!student.image && <UserOutlined />}
+              size="large"
+              className="bg-purple-500 flex-shrink-0"
+            />
+            <div className="flex-1 min-w-0">
+              <Text className="font-medium block truncate">
+                {student.full_name}
+              </Text>
+              <Text className="text-xs text-gray-500">
+                {student.student_id_number}
+              </Text>
+              {student.group && (
+                <Tag size="small" color="blue" className="mt-1">
+                  {student.group.name}
+                </Tag>
+              )}
+            </div>
+          </div>
+          <Switch
+            checked={student.present}
+            onChange={(checked) => handlePresenceChange(student._id, checked)}
+            checkedChildren="Keldi"
+            unCheckedChildren="Yo'q"
+          />
+        </div>
+        {!student.present && (
+          <Input
+            placeholder="Kelmagan sababi..."
+            value={student.reason}
+            onChange={(e) => handleReasonChange(student._id, e.target.value)}
+            size="small"
+          />
+        )}
+      </div>
+    </Card>
+  );
 
   // Desktop table columns
   const columns = [
@@ -219,59 +273,14 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
     },
   ];
 
-  // Mobile list item component
-  const MobileStudentItem = ({ student }) => (
-    <List.Item className="border-b py-3 px-0">
-      <div className="w-full space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Avatar
-              src={student.image}
-              icon={!student.image && <UserOutlined />}
-              size="large"
-              className="bg-purple-500 flex-shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <Text className="font-medium block truncate">
-                {student.full_name}
-              </Text>
-              <Text className="text-xs text-gray-500">
-                {student.student_id_number}
-              </Text>
-              {student.group && (
-                <Tag size="small" color="blue" className="mt-1">
-                  {student.group.name}
-                </Tag>
-              )}
-            </div>
-          </div>
-          <Switch
-            checked={student.present}
-            onChange={(checked) => handlePresenceChange(student._id, checked)}
-            checkedChildren="Keldi"
-            unCheckedChildren="Yo'q"
-          />
-        </div>
-        {!student.present && (
-          <Input
-            placeholder="Kelmagan sababi..."
-            value={student.reason}
-            onChange={(e) => handleReasonChange(student._id, e.target.value)}
-            size="small"
-          />
-        )}
-      </div>
-    </List.Item>
-  );
-
   const content = (
     <>
       {/* Mavjud davomat haqida ogohlantirish */}
       {existingAttendance?.data && (
         <Alert
           message="Bu sana uchun davomat allaqachon kiritilgan"
-          description="Siz mavjud davomatni yangilayapsiz"
-          type="info"
+          description="Bu davomatni o'zgartirib bo'lmaydi"
+          type="error"
           icon={<ExclamationCircleOutlined />}
           className="mb-4"
           showIcon
@@ -293,10 +302,9 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
       ) : filteredStudents.length > 0 ? (
         isMobile ? (
           <div className="max-h-96 overflow-y-auto">
-            <List
-              dataSource={filteredStudents}
-              renderItem={(student) => <MobileStudentItem student={student} />}
-            />
+            {filteredStudents.map((student) => (
+              <MobileStudentCard key={student._id} student={student} />
+            ))}
           </div>
         ) : (
           <Table
@@ -327,6 +335,7 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
             placeholder="https://t.me/channel/123"
             value={telegramPostLink}
             onChange={(e) => setTelegramPostLink(e.target.value)}
+            disabled={existingAttendance?.data}
           />
         </div>
 
@@ -337,6 +346,7 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
+            disabled={existingAttendance?.data}
           />
         </div>
 
@@ -363,16 +373,18 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
       <Button onClick={onClose} disabled={marking}>
         Bekor qilish
       </Button>
-      <Button
-        type="primary"
-        icon={<SaveOutlined />}
-        onClick={handleSubmit}
-        loading={marking}
-        disabled={students.length === 0}
-        className="bg-gradient-to-r from-purple-500 to-pink-600 border-0"
-      >
-        Saqlash
-      </Button>
+      {!existingAttendance?.data && (
+        <Button
+          type="primary"
+          icon={<SaveOutlined />}
+          onClick={handleSubmit}
+          loading={marking}
+          disabled={students.length === 0}
+          className="bg-gradient-to-r from-purple-500 to-pink-600 border-0"
+        >
+          Saqlash
+        </Button>
+      )}
     </div>
   );
 

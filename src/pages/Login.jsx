@@ -30,7 +30,7 @@ export default function Login() {
       const result = await dispatch(login(values)).unwrap();
       if (result.success) {
         if (result.data.user.role !== "tutor") {
-          message.error("Faqat tutorlar kirishi mumkin");
+          message.error("Faqat o'qituvchilar kirishi mumkin");
           return;
         }
         message.success("Muvaffaqiyatli kirish!");
@@ -52,7 +52,7 @@ export default function Login() {
               <BookOutlined className="text-3xl text-purple-500" />
             </div>
             <Title level={2} className="!text-white !mb-2">
-              Tutor Panel
+              O'qituvchi Panel
             </Title>
             <Text className="text-white/90">To'garak rahbarlari uchun</Text>
           </div>

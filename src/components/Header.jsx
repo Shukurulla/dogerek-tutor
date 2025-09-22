@@ -13,6 +13,7 @@ import {
   List,
   Empty,
   message,
+  Grid,
 } from "antd";
 import {
   MenuFoldOutlined,
@@ -36,28 +37,21 @@ dayjs.locale("uz");
 
 const { Header: AntHeader } = Layout;
 const { Text, Title } = Typography;
+const { useBreakpoint } = Grid;
 
 export default function Header({ collapsed, setCollapsed }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const [notificationDrawer, setNotificationDrawer] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const screens = useBreakpoint();
+  const isMobile = !screens.lg;
 
   const { data: applicationsData } = useGetApplicationsQuery("pending");
   const { data: dashboardData } = useGetTutorDashboardQuery();
 
   const pendingCount = applicationsData?.data?.length || 0;
   const stats = dashboardData?.data || {};
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -115,18 +109,7 @@ export default function Header({ collapsed, setCollapsed }) {
           },
         ]
       : []),
-    ...(stats.recentApplications?.map((app, index) => ({
-      key: `app-${index}`,
-      type: "info",
-      title: app.student?.full_name || "Yangi ariza",
-      description: `${app.club?.name} to'garagiga ariza`,
-      time: dayjs(app.applicationDate),
-      onClick: () => {
-        navigate("/applications");
-        setNotificationDrawer(false);
-      },
-    })) || []),
-  ].slice(0, 10); // Limit to 10 notifications
+  ].slice(0, 10);
 
   const NotificationItem = ({ notification }) => (
     <List.Item
@@ -152,8 +135,11 @@ export default function Header({ collapsed, setCollapsed }) {
   return (
     <>
       <AntHeader
-        className="bg-white px-4 sm:px-6 flex items-center justify-between shadow-sm sticky top-0 z-10"
-        style={{ padding: isMobile ? "0 16px" : "0 24px" }}
+        className="bg-white flex items-center justify-between shadow-sm sticky top-0 z-10"
+        style={{
+          padding: isMobile ? "0 16px" : "0 24px",
+          height: 64,
+        }}
       >
         <div className="flex items-center gap-2 sm:gap-4">
           {!isMobile && (
@@ -166,22 +152,19 @@ export default function Header({ collapsed, setCollapsed }) {
           )}
 
           {isMobile ? (
-            <div>
-              <Title level={5} className="!mb-0 !text-base">
-                Tutor Panel
+            <>
+              <Title level={5} className="m-0 p-0 !text-base">
+                O'qituvchi Panel
               </Title>
-              <Text className="text-xs text-gray-500">
-                {stats.totalClubs || 0} ta to'garak
-              </Text>
-            </div>
+            </>
           ) : (
-            <Text className="font-medium text-gray-700">
-              {user?.assignedClubs?.length || stats.totalClubs || 0} ta to'garak
-            </Text>
+            <div>
+              <Text className="font-semibold text-lg">O'qituvchi Panel</Text>
+            </div>
           )}
         </div>
 
-        <Space size={isMobile ? "small" : "large"}>
+        <Space size={isMobile ? "small" : "middle"}>
           <Badge count={notifications.length} size="small">
             <Button
               type="text"
@@ -198,19 +181,19 @@ export default function Header({ collapsed, setCollapsed }) {
             placement="bottomRight"
             arrow
           >
-            <Space className="cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-1 rounded-lg transition-colors">
+            <Space className="cursor-pointer hover:bg-gray-50 px-2 py-1 rounded-lg transition-colors">
               <Avatar
                 size={isMobile ? "small" : "default"}
                 src={user?.profile?.image}
                 icon={!user?.profile?.image && <UserOutlined />}
-                className="bg-purple-500"
+                className="bg-gradient-to-r from-purple-500 to-pink-600"
               />
               {!isMobile && (
                 <div className="text-left">
                   <div className="font-medium text-sm">
                     {user?.profile?.fullName || user?.username}
                   </div>
-                  <div className="text-xs text-gray-500">Tutor</div>
+                  <div className="text-xs text-gray-500">O'qituvchi</div>
                 </div>
               )}
             </Space>
@@ -241,6 +224,7 @@ export default function Header({ collapsed, setCollapsed }) {
       >
         {notifications.length > 0 ? (
           <List
+            className="p-3"
             dataSource={notifications}
             renderItem={(notification) => (
               <NotificationItem notification={notification} />

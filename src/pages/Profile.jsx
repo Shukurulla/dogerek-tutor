@@ -74,7 +74,7 @@ export default function Profile() {
             <Title level={4} className="!mb-1">
               {user?.profile?.fullName || user?.username}
             </Title>
-            <Text className="text-gray-500">Tutor</Text>
+            <Text className="text-gray-500">O'qituvchi</Text>
 
             <Divider />
 
@@ -319,43 +319,6 @@ export default function Profile() {
                 </Button>
               </Form.Item>
             </Form>
-          </Card>
-
-          <Card
-            title="To'garaklar statistikasi"
-            className="shadow-md border-0 mt-6"
-          >
-            <Row gutter={[16, 16]}>
-              <Col xs={12} md={6}>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <div className="text-3xl font-bold text-purple-600">
-                    {user?.assignedClubs?.length || 0}
-                  </div>
-                  <Text className="text-gray-600">To'garaklar</Text>
-                </div>
-              </Col>
-
-              <Col xs={12} md={6}>
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-3xl font-bold text-blue-600">45</div>
-                  <Text className="text-gray-600">Studentlar</Text>
-                </div>
-              </Col>
-
-              <Col xs={12} md={6}>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-3xl font-bold text-green-600">12</div>
-                  <Text className="text-gray-600">Oy davomida darslar</Text>
-                </div>
-              </Col>
-
-              <Col xs={12} md={6}>
-                <div className="text-center p-4 bg-orange-50 rounded-lg">
-                  <div className="text-3xl font-bold text-orange-600">87%</div>
-                  <Text className="text-gray-600">O'rtacha davomat</Text>
-                </div>
-              </Col>
-            </Row>
           </Card>
         </Col>
       </Row>

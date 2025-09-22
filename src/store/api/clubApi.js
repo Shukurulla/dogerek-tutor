@@ -206,10 +206,35 @@ export const clubApi = baseApi.injectEndpoints({
         { type: "Club", id: clubId },
       ],
     }),
+    updateClubSettings: builder.mutation({
+      query: ({ clubId, ...settings }) => ({
+        url: `/tutor/club/${clubId}/settings`,
+        method: "PUT",
+        body: settings,
+      }),
+      invalidatesTags: (result, error, { clubId }) => [
+        { type: "Club", id: clubId },
+      ],
+    }),
+
+    // Remove student from club
+    removeStudentFromClub: builder.mutation({
+      query: ({ clubId, studentId }) => ({
+        url: `/tutor/club/${clubId}/remove-student`,
+        method: "POST",
+        body: { studentId },
+      }),
+      invalidatesTags: (result, error, { clubId }) => [
+        { type: "Club", id: `students-${clubId}` },
+        { type: "Club", id: clubId },
+        "Dashboard",
+      ],
+    }),
   }),
 });
 
 export const {
+  useRemoveStudentFromClubMutation,
   useGetAllClubsQuery,
   useGetClubByIdQuery,
   useGetClubStudentsQuery,

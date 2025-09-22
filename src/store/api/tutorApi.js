@@ -1,3 +1,4 @@
+// src/store/api/tutorApi.js - Studentni chiqarish uchun yangi endpoint
 import { baseApi } from "./baseApi";
 
 export const tutorApi = baseApi.injectEndpoints({
@@ -8,7 +9,7 @@ export const tutorApi = baseApi.injectEndpoints({
       providesTags: ["Dashboard"],
     }),
 
-    // My Clubs
+    // My Clubs - O'zgartirish: Barcha kurslar uchun
     getMyClubs: builder.query({
       query: () => "/tutor/clubs",
       providesTags: ["Club"],
@@ -65,20 +66,39 @@ export const tutorApi = baseApi.injectEndpoints({
       invalidatesTags: ["Attendance"],
     }),
 
-    // Get attendance by specific date
+    // Get attendance by specific date - O'zgartirish: Mavjudlikni tekshirish
     getAttendanceByDate: builder.query({
       query: ({ date, clubId }) => ({
-        url: "/attendance/by-date",
+        url: "/tutor/attendance/by-date",
         params: { date, clubId },
       }),
       providesTags: ["Attendance"],
     }),
 
-    // Get students for a specific club
+    // Get students for a specific club - O'zgartirish: "all" uchun barcha studentlar
     getClubStudents: builder.query({
-      query: (clubId) => `/clubs/${clubId}/students`,
+      query: (clubId) => {
+        if (clubId === "all" || !clubId) {
+          return "/tutor/all-students"; // Barcha studentlar uchun yangi endpoint
+        }
+        return `/clubs/${clubId}/students`;
+      },
       providesTags: (result, error, clubId) => [
         { type: "Club", id: `students-${clubId}` },
+      ],
+    }),
+
+    // Yangi: Studentni kursdan chiqarish
+    removeStudentFromClub: builder.mutation({
+      query: ({ studentId, clubId }) => ({
+        url: `/tutor/club/${clubId}/remove-student`,
+        method: "POST",
+        body: { studentId },
+      }),
+      invalidatesTags: (result, error, { clubId }) => [
+        { type: "Club", id: `students-${clubId}` },
+        { type: "Club", id: clubId },
+        "Dashboard",
       ],
     }),
 
@@ -164,7 +184,7 @@ export const tutorApi = baseApi.injectEndpoints({
       providesTags: ["Attendance"],
     }),
 
-    // Update club information (for tutors with permission)
+    // Update club information (for o'qituvchis with permission)
     updateClub: builder.mutation({
       query: ({ id, ...data }) => ({
         url: `/tutor/club/${id}`,
@@ -236,6 +256,12 @@ export const tutorApi = baseApi.injectEndpoints({
         { type: "Attendance", id: attendanceId },
       ],
     }),
+
+    // Get all students from all clubs (for "Barcha kurslar" option)
+    getAllStudents: builder.query({
+      query: () => "/tutor/all-students",
+      providesTags: ["Student"],
+    }),
   }),
 });
 
@@ -250,6 +276,7 @@ export const {
   useAddTelegramPostMutation,
   useGetAttendanceByDateQuery,
   useGetClubStudentsQuery,
+  useRemoveStudentFromClubMutation, // Yangi hook
   useGetClubDetailsQuery,
   useGetAttendanceStatisticsQuery,
   useGetStudentAttendanceSummaryQuery,
@@ -266,4 +293,5 @@ export const {
   useGenerateAttendanceQRMutation,
   useVerifyAttendanceQRMutation,
   useAddAttendanceNoteMutation,
+  useGetAllStudentsQuery, // Yangi hook
 } = tutorApi;

@@ -9,25 +9,141 @@ import {
   Modal,
   Input,
   Typography,
+  Avatar,
+  Tag,
+  Skeleton,
 } from "antd";
-import { CheckOutlined, CloseOutlined } from "@ant-design/icons";
+import {
+  CheckOutlined,
+  CloseOutlined,
+  UserOutlined,
+  CalendarOutlined,
+  BookOutlined,
+} from "@ant-design/icons";
 import {
   useGetApplicationsQuery,
   useProcessApplicationMutation,
 } from "../store/api/tutorApi";
-import ApplicationCard from "../components/ApplicationCard";
 import LoadingSpinner from "../components/LoadingSpinner";
+import dayjs from "dayjs";
 
 const { TabPane } = Tabs;
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
+
+// Application List Item Component
+const ApplicationListItem = ({
+  application,
+  onApprove,
+  onReject,
+  processing,
+}) => {
+  const { student, club, status, applicationDate, rejectionReason } =
+    application;
+
+  const statusColors = {
+    pending: "warning",
+    approved: "success",
+    rejected: "error",
+  };
+
+  const statusTexts = {
+    pending: "Kutilmoqda",
+    approved: "Qabul qilingan",
+    rejected: "Rad etilgan",
+  };
+
+  return (
+    <Card className="mb-4 shadow-sm hover:shadow-md transition-shadow">
+      <div className="space-y-4">
+        {/* Student Info */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <Avatar
+              src={student?.image}
+              icon={!student?.image && <UserOutlined />}
+              size="large"
+              className="bg-purple-500"
+            />
+            <div>
+              <Text className="font-medium block">{student?.full_name}</Text>
+              <Text className="text-xs text-gray-500">
+                {student?.student_id_number}
+              </Text>
+              <Tag color="blue" className="mt-1" size="small">
+                {student?.group?.name}
+              </Tag>
+            </div>
+          </div>
+          <Tag color={statusColors[status]}>{statusTexts[status]}</Tag>
+        </div>
+
+        {/* Club and Date Info */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-gray-600">
+            <BookOutlined className="text-sm" />
+            <Text className="text-sm">To'garak: {club?.name}</Text>
+          </div>
+
+          <div className="flex items-center gap-2 text-gray-600">
+            <CalendarOutlined className="text-sm" />
+            <Text className="text-sm">
+              {dayjs(applicationDate).format("DD.MM.YYYY HH:mm")}
+            </Text>
+          </div>
+        </div>
+
+        {/* Department Info */}
+        {student?.department && (
+          <div className="pt-2 border-t">
+            <Tag color="purple">{student.department.name}</Tag>
+          </div>
+        )}
+
+        {/* Rejection Reason */}
+        {status === "rejected" && rejectionReason && (
+          <div className="p-3 bg-red-50 rounded-lg">
+            <Text className="text-red-600 text-sm">
+              <strong>Rad etish sababi:</strong> {rejectionReason}
+            </Text>
+          </div>
+        )}
+
+        {/* Action Buttons for Pending */}
+        {status === "pending" && (
+          <div className="flex gap-2 pt-3 border-t">
+            <Button
+              type="primary"
+              icon={<CheckOutlined />}
+              onClick={() => onApprove(application._id)}
+              loading={processing}
+              className="flex-1 bg-green-500 border-0"
+            >
+              Qabul qilish
+            </Button>
+            <Button
+              danger
+              icon={<CloseOutlined />}
+              onClick={() => onReject(application._id)}
+              loading={processing}
+              className="flex-1"
+            >
+              Rad etish
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+};
 
 export default function Applications() {
   const [activeTab, setActiveTab] = useState("pending");
   const [rejectModal, setRejectModal] = useState({ visible: false, id: null });
   const [rejectReason, setRejectReason] = useState("");
 
-  const { data, isLoading } = useGetApplicationsQuery(activeTab);
+  // Real API calls
+  const { data, isLoading, refetch } = useGetApplicationsQuery(activeTab);
   const [processApplication, { isLoading: processing }] =
     useProcessApplicationMutation();
 
@@ -42,9 +158,10 @@ export default function Applications() {
 
       if (result.success) {
         message.success("Ariza qabul qilindi");
+        refetch(); // Refresh the list
       }
     } catch (error) {
-      message.error("Xatolik yuz berdi");
+      message.error(error?.data?.message || "Xatolik yuz berdi");
     }
   };
 
@@ -65,9 +182,10 @@ export default function Applications() {
         message.success("Ariza rad etildi");
         setRejectModal({ visible: false, id: null });
         setRejectReason("");
+        refetch(); // Refresh the list
       }
     } catch (error) {
-      message.error("Xatolik yuz berdi");
+      message.error(error?.data?.message || "Xatolik yuz berdi");
     }
   };
 
@@ -77,7 +195,14 @@ export default function Applications() {
     rejected: applications.filter((a) => a.status === "rejected").length,
   };
 
-  if (isLoading) return <LoadingSpinner size="large" />;
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Title level={3}>Arizalar</Title>
+        <Skeleton active paragraph={{ rows: 5 }} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -85,52 +210,21 @@ export default function Applications() {
 
       <Tabs
         activeKey={activeTab}
-        onChange={setActiveTab}
+        onChange={(key) => {
+          setActiveTab(key);
+          refetch(); // Fetch new data when tab changes
+        }}
         className="custom-tabs"
       >
-        <TabPane
-          tab={
-            <span>
-              Kutilayotgan
-              {counts.pending > 0 && (
-                <Badge count={counts.pending} className="ml-2" />
-              )}
-            </span>
-          }
-          key="pending"
-        />
-        <TabPane
-          tab={
-            <span>
-              Qabul qilingan
-              <Badge
-                count={counts.approved}
-                showZero
-                className="ml-2 bg-green-500"
-              />
-            </span>
-          }
-          key="approved"
-        />
-        <TabPane
-          tab={
-            <span>
-              Rad etilgan
-              <Badge
-                count={counts.rejected}
-                showZero
-                className="ml-2 bg-red-500"
-              />
-            </span>
-          }
-          key="rejected"
-        />
+        <TabPane tab={<span>Kutilayotgan</span>} key="pending" />
+        <TabPane tab={<span>Qabul qilingan</span>} key="approved" />
+        <TabPane tab={<span>Rad etilgan</span>} key="rejected" />
       </Tabs>
 
       {applications.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="max-w-3xl mx-auto">
           {applications.map((application) => (
-            <ApplicationCard
+            <ApplicationListItem
               key={application._id}
               application={application}
               onApprove={handleApprove}
