@@ -227,7 +227,7 @@ export default function Dashboard() {
       </Row>
 
       <Row gutter={[12, 12]} className="px-2 sm:px-0">
-        <Col xs={24} lg={8}>
+        <Col xs={24} lg={12}>
           <Card
             title={
               <span className="text-sm sm:text-base">Mening to'garaklarim</span>
@@ -290,7 +290,7 @@ export default function Dashboard() {
           </Card>
         </Col>
 
-        <Col xs={24} lg={8}>
+        <Col xs={24} lg={12}>
           <Card
             title={
               <span className="text-sm sm:text-base">Haftalik davomat</span>
@@ -321,61 +321,6 @@ export default function Dashboard() {
             ) : (
               <Empty
                 description="Davomat ma'lumoti yo'q"
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-              />
-            )}
-          </Card>
-        </Col>
-
-        <Col xs={24} lg={8}>
-          <Card
-            title={
-              <span className="flex items-center gap-2 text-sm sm:text-base">
-                <TrophyOutlined className="text-yellow-500" />
-                <span className="hidden sm:inline">Eng faol studentlar</span>
-                <span className="sm:hidden">Top studentlar</span>
-              </span>
-            }
-            className="shadow-md border-0 h-full"
-            bodyStyle={{ padding: "12px 16px" }}
-          >
-            {stats.topStudents && stats.topStudents.length > 0 ? (
-              <List
-                dataSource={stats.topStudents.slice(0, 3)}
-                renderItem={(item, index) => (
-                  <List.Item className="border-0 px-0 py-2">
-                    <div className="flex items-center gap-2 sm:gap-3 w-full">
-                      <Avatar
-                        size={window.innerWidth < 640 ? "small" : "default"}
-                        src={item.student?.image}
-                        className={`${
-                          index === 0
-                            ? "bg-yellow-500"
-                            : index === 1
-                            ? "bg-gray-400"
-                            : "bg-orange-500"
-                        } flex-shrink-0`}
-                      >
-                        {!item.student?.image && index + 1}
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <Text className="font-medium block truncate text-sm sm:text-base">
-                          {item.student?.full_name || item.name}
-                        </Text>
-                        <Text className="text-xs text-gray-500">
-                          {item.club?.name}
-                        </Text>
-                      </div>
-                      <Tag color="green" className="ml-auto">
-                        {item.attendancePercentage || item.attendance}%
-                      </Tag>
-                    </div>
-                  </List.Item>
-                )}
-              />
-            ) : (
-              <Empty
-                description="Ma'lumot mavjud emas"
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             )}

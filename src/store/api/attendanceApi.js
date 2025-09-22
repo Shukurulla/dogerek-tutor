@@ -1,3 +1,4 @@
+// src/store/api/attendanceApi.js
 import { baseApi } from "./baseApi";
 
 export const attendanceApi = baseApi.injectEndpoints({
@@ -11,7 +12,7 @@ export const attendanceApi = baseApi.injectEndpoints({
       providesTags: ["Attendance"],
     }),
 
-    // Get student attendance
+    // Get student attendance - UPDATED FOR MODAL
     getStudentAttendance: builder.query({
       query: ({ studentId, clubId, startDate, endDate }) => ({
         url: `/attendance/student/${studentId}`,
@@ -20,6 +21,40 @@ export const attendanceApi = baseApi.injectEndpoints({
       providesTags: (result, error, { studentId }) => [
         { type: "Attendance", id: `student-${studentId}` },
       ],
+      transformResponse: (response) => {
+        // Format the response for better usage in modal
+        if (response?.success && response?.data) {
+          const data = response.data;
+
+          // Calculate additional statistics if not present
+          if (!data.statistics && data.attendance) {
+            const totalClasses = data.attendance.length;
+            const presentCount = data.attendance.filter(
+              (a) => a.present
+            ).length;
+            const absentCount = totalClasses - presentCount;
+            const attendancePercentage =
+              totalClasses > 0
+                ? ((presentCount / totalClasses) * 100).toFixed(1)
+                : 0;
+
+            data.statistics = {
+              totalClasses,
+              presentCount,
+              absentCount,
+              attendancePercentage,
+            };
+          }
+
+          // Sort attendance by date (newest first)
+          if (data.attendance) {
+            data.attendance.sort((a, b) => new Date(b.date) - new Date(a.date));
+          }
+
+          return response;
+        }
+        return response;
+      },
     }),
 
     // Get club attendance report
@@ -56,15 +91,6 @@ export const attendanceApi = baseApi.injectEndpoints({
       ],
     }),
 
-    // Delete attendance record (for admin)
-    deleteAttendance: builder.mutation({
-      query: (id) => ({
-        url: `/admin/attendance/${id}`,
-        method: "DELETE",
-      }),
-      invalidatesTags: ["Attendance", "Dashboard"],
-    }),
-
     // Get attendance by date
     getAttendanceByDate: builder.query({
       query: ({ date, clubId }) => ({
@@ -81,6 +107,39 @@ export const attendanceApi = baseApi.injectEndpoints({
         params: { clubId, startDate, endDate, groupBy },
       }),
       providesTags: ["Attendance"],
+    }),
+
+    // Get student attendance summary with detailed info
+    getStudentAttendanceSummary: builder.query({
+      query: ({ studentId, clubId, period = "all" }) => ({
+        url: `/attendance/student/${studentId}/summary`,
+        params: { clubId, period },
+      }),
+      providesTags: (result, error, { studentId }) => [
+        { type: "Attendance", id: `summary-${studentId}` },
+      ],
+    }),
+
+    // Get attendance patterns for a student
+    getStudentAttendancePatterns: builder.query({
+      query: ({ studentId, clubId }) => ({
+        url: `/attendance/student/${studentId}/patterns`,
+        params: { clubId },
+      }),
+      providesTags: (result, error, { studentId }) => [
+        { type: "Attendance", id: `patterns-${studentId}` },
+      ],
+    }),
+
+    // Get absent reasons for student
+    getStudentAbsentReasons: builder.query({
+      query: ({ studentId, clubId }) => ({
+        url: `/attendance/student/${studentId}/absent-reasons`,
+        params: { clubId },
+      }),
+      providesTags: (result, error, { studentId }) => [
+        { type: "Attendance", id: `reasons-${studentId}` },
+      ],
     }),
 
     // Export attendance report
@@ -128,17 +187,6 @@ export const attendanceApi = baseApi.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ["Attendance", "Dashboard"],
-    }),
-
-    // Get student attendance summary
-    getStudentAttendanceSummary: builder.query({
-      query: ({ studentId, period = "month" }) => ({
-        url: `/attendance/student/${studentId}/summary`,
-        params: { period },
-      }),
-      providesTags: (result, error, { studentId }) => [
-        { type: "Attendance", id: `summary-${studentId}` },
-      ],
     }),
 
     // Get club attendance patterns
@@ -209,6 +257,17 @@ export const attendanceApi = baseApi.injectEndpoints({
         responseHandler: (response) => response.blob(),
       }),
     }),
+
+    // Get detailed student attendance history
+    getStudentAttendanceHistory: builder.query({
+      query: ({ studentId, clubId, page = 1, limit = 20 }) => ({
+        url: `/attendance/student/${studentId}/history`,
+        params: { clubId, page, limit },
+      }),
+      providesTags: (result, error, { studentId }) => [
+        { type: "Attendance", id: `history-${studentId}` },
+      ],
+    }),
   }),
 });
 
@@ -218,15 +277,16 @@ export const {
   useGetClubAttendanceReportQuery,
   useMarkAttendanceMutation,
   useUpdateAttendanceMutation,
-  useDeleteAttendanceMutation,
   useGetAttendanceByDateQuery,
   useGetAttendanceStatisticsQuery,
+  useGetStudentAttendanceSummaryQuery,
+  useGetStudentAttendancePatternsQuery,
+  useGetStudentAbsentReasonsQuery,
   useExportAttendanceReportMutation,
   useGetAbsentStudentsQuery,
   useSendAttendanceNotificationMutation,
   useGetAttendanceTrendsQuery,
   useBulkMarkAttendanceMutation,
-  useGetStudentAttendanceSummaryQuery,
   useGetClubAttendancePatternsQuery,
   useVerifyAttendanceQRMutation,
   useGetAttendanceWarningsQuery,
@@ -234,4 +294,5 @@ export const {
   useGetAttendanceComparisonQuery,
   useGetAttendanceByWeekTypeQuery,
   useGenerateAttendanceCertificateMutation,
+  useGetStudentAttendanceHistoryQuery,
 } = attendanceApi;

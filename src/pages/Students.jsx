@@ -2,46 +2,356 @@ import { useState, useEffect } from "react";
 import {
   Card,
   Select,
-  Table,
   Avatar,
   Tag,
   Typography,
   Input,
-  Badge,
-  List,
-  Drawer,
   Button,
   Space,
-  Skeleton,
   Empty,
   Statistic,
   Modal,
   message,
   Popconfirm,
   notification,
+  Row,
+  Col,
+  Drawer,
+  Progress,
+  Timeline,
+  List,
+  Tooltip,
+  Badge,
 } from "antd";
 import {
   SearchOutlined,
   UserOutlined,
   PhoneOutlined,
   MailOutlined,
-  CheckCircleOutlined,
+  CalendarOutlined,
   TeamOutlined,
   FilterOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ClockCircleOutlined,
+  InfoCircleOutlined,
+  BookOutlined,
 } from "@ant-design/icons";
 import { useGetMyClubsQuery } from "../store/api/tutorApi";
 import {
   useGetClubStudentsQuery,
   useRemoveStudentFromClubMutation,
 } from "../store/api/clubApi";
+import { useGetStudentAttendanceQuery } from "../store/api/attendanceApi";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatPhoneNumber } from "../utils/helpers";
 import { useLocation } from "react-router-dom";
+import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
 
+// Student Attendance Modal Component
+const StudentAttendanceModal = ({ visible, onClose, student, clubId }) => {
+  const { data: attendanceData, isLoading } = useGetStudentAttendanceQuery(
+    {
+      studentId: student?._id,
+      clubId: clubId,
+    },
+    { skip: !student?._id || !visible }
+  );
+
+  const attendance = attendanceData?.data?.attendance || [];
+  const stats = attendanceData?.data?.statistics || {};
+
+  const getAttendanceColor = (present) => {
+    return present ? "#52c41a" : "#f5222d";
+  };
+
+  const getAttendanceIcon = (present) => {
+    return present ? (
+      <CheckCircleOutlined style={{ color: "#52c41a" }} />
+    ) : (
+      <CloseCircleOutlined style={{ color: "#f5222d" }} />
+    );
+  };
+
+  return (
+    <Modal
+      title={
+        <div className="flex items-center gap-3">
+          <Avatar
+            src={student?.image}
+            icon={!student?.image && <UserOutlined />}
+            size="large"
+            className="bg-purple-500"
+          />
+          <div>
+            <Text className="text-lg font-medium block">
+              {student?.full_name}
+            </Text>
+            <Text className="text-sm text-gray-500">
+              {student?.student_id_number}
+            </Text>
+          </div>
+        </div>
+      }
+      open={visible}
+      onCancel={onClose}
+      footer={
+        <Button onClick={onClose} type="primary">
+          Yopish
+        </Button>
+      }
+      width={900}
+      className="attendance-modal"
+      bodyStyle={{ maxHeight: "80vh", overflowY: "auto" }}
+    >
+      {isLoading ? (
+        <LoadingSpinner />
+      ) : (
+        <div className="space-y-4">
+          {/* Statistics Cards */}
+          <Row gutter={[12, 12]}>
+            <Col xs={12} sm={6}>
+              <Card className="text-center border-0 bg-blue-50">
+                <Statistic
+                  title="Jami darslar"
+                  value={stats.totalClasses || 0}
+                  prefix={<CalendarOutlined />}
+                  valueStyle={{ fontSize: 20 }}
+                />
+              </Card>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Card className="text-center border-0 bg-green-50">
+                <Statistic
+                  title="Kelgan"
+                  value={stats.presentCount || 0}
+                  prefix={<CheckCircleOutlined />}
+                  valueStyle={{ fontSize: 20, color: "#52c41a" }}
+                />
+              </Card>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Card className="text-center border-0 bg-red-50">
+                <Statistic
+                  title="Kelmagan"
+                  value={stats.absentCount || 0}
+                  prefix={<CloseCircleOutlined />}
+                  valueStyle={{ fontSize: 20, color: "#f5222d" }}
+                />
+              </Card>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Card className="text-center border-0 bg-purple-50">
+                <Statistic
+                  title="Davomat"
+                  value={stats.attendancePercentage || 0}
+                  suffix="%"
+                  valueStyle={{ fontSize: 20, color: "#722ed1" }}
+                />
+              </Card>
+            </Col>
+          </Row>
+
+          {/* Attendance Progress */}
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <Text className="font-medium mb-2 block">Davomat foizi</Text>
+            <Progress
+              percent={parseFloat(stats.attendancePercentage || 0)}
+              strokeColor={{
+                "0%": "#108ee9",
+                "100%": "#87d068",
+              }}
+              status={
+                stats.attendancePercentage >= 75 ? "success" : "exception"
+              }
+            />
+          </div>
+
+          {/* Attendance Timeline - ENLARGED */}
+          <div className="border rounded-lg p-4 bg-white">
+            <Text className="font-semibold text-lg mb-4 block">
+              Davomat tarixi
+            </Text>
+            {attendance.length > 0 ? (
+              <div
+                className="overflow-y-auto pr-3"
+                style={{
+                  maxHeight: "450px",
+                  minHeight: "350px",
+                }}
+              >
+                <Timeline
+                  items={attendance.map((record) => ({
+                    dot: getAttendanceIcon(record.present),
+                    color: getAttendanceColor(record.present),
+                    children: (
+                      <div className="pb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <Text className="font-medium text-base">
+                            {dayjs(record.date).format("DD.MM.YYYY")}
+                          </Text>
+                          <Tag
+                            color={record.present ? "success" : "error"}
+                            icon={getAttendanceIcon(record.present)}
+                            className="text-sm px-3 py-1"
+                          >
+                            {record.present ? "Kelgan" : "Kelmagan"}
+                          </Tag>
+                        </div>
+                        <Text className="text-sm text-gray-500">
+                          {dayjs(record.date).format("dddd")}
+                        </Text>
+                        {record.reason && (
+                          <div className="mt-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                            <Text className="text-sm">
+                              <InfoCircleOutlined className="mr-2 text-orange-500" />
+                              <span className="font-medium">Sababi:</span>{" "}
+                              {record.reason}
+                            </Text>
+                          </div>
+                        )}
+                      </div>
+                    ),
+                  }))}
+                />
+              </div>
+            ) : (
+              <div className="py-12">
+                <Empty description="Davomat ma'lumotlari mavjud emas" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+};
+
+// Student Card Component
+const StudentCard = ({
+  student,
+  onRemove,
+  onViewAttendance,
+  removing,
+  isMobile,
+}) => {
+  const attendancePercentage = student.attendancePercentage || 0;
+  const attendanceColor =
+    attendancePercentage >= 90
+      ? "success"
+      : attendancePercentage >= 75
+      ? "warning"
+      : "error";
+
+  return (
+    <Card
+      className="h-full hover:shadow-xl transition-all duration-300 border-0"
+      bodyStyle={{ padding: isMobile ? "16px" : "24px" }}
+    >
+      <div className="space-y-4">
+        {/* Header with Avatar and Basic Info */}
+        <div className="flex items-start gap-4">
+          <Avatar
+            src={student.image}
+            icon={!student.image && <UserOutlined />}
+            size={isMobile ? 60 : 80}
+            className="bg-gradient-to-r from-purple-500 to-pink-600 flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <Tooltip title={student.full_name}>
+              <Text className="font-bold text-lg block truncate">
+                {student.full_name}
+              </Text>
+            </Tooltip>
+            <Text className="text-base text-gray-500">
+              ID: {student.student_id_number}
+            </Text>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {student.group && (
+                <Tag color="purple" icon={<TeamOutlined />} className="text-sm">
+                  {student.group.name}
+                </Tag>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Department Info */}
+        {student.department && (
+          <div className="bg-blue-50 rounded-lg p-3">
+            <Text className="text-xs text-gray-500 block mb-1">Fakultet</Text>
+            <Tooltip title={student.department.name}>
+              <Text className="font-medium text-sm truncate block">
+                {student.department.name}
+              </Text>
+            </Tooltip>
+          </div>
+        )}
+
+        {/* Contact Information */}
+        <div className="space-y-2 border-t pt-3">
+          {student.phone && (
+            <div className="flex items-center gap-2 text-gray-600">
+              <PhoneOutlined className="text-base" />
+              <Text className="text-sm">
+                {formatPhoneNumber(student.phone)}
+              </Text>
+            </div>
+          )}
+          {student.email && (
+            <div className="flex items-center gap-2 text-gray-600">
+              <MailOutlined className="text-base" />
+              <Tooltip title={student.email}>
+                <Text
+                  className="text-sm truncate"
+                  style={{ maxWidth: "280px" }}
+                >
+                  {student.email}
+                </Text>
+              </Tooltip>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 pt-2">
+          <Button
+            type="primary"
+            icon={<CalendarOutlined />}
+            onClick={() => onViewAttendance(student)}
+            className="flex-1"
+            size={isMobile ? "middle" : "large"}
+          >
+            Davomat ko'rish
+          </Button>
+          <Popconfirm
+            title="Studentni chiqarish"
+            description={`${student.full_name}ni to'garakdan chiqarishni tasdiqlaysizmi?`}
+            onConfirm={() => onRemove(student)}
+            okText="Ha"
+            cancelText="Yo'q"
+            okButtonProps={{ danger: true, loading: removing }}
+          >
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              loading={removing}
+              size={isMobile ? "middle" : "large"}
+            >
+              Chiqarish
+            </Button>
+          </Popconfirm>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+// Main Students Component
 export default function Students() {
   const location = useLocation();
   const [selectedClub, setSelectedClub] = useState(
@@ -49,6 +359,9 @@ export default function Students() {
   );
   const [searchText, setSearchText] = useState("");
   const [filterDrawerVisible, setFilterDrawerVisible] = useState(false);
+  const [attendanceModalVisible, setAttendanceModalVisible] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+
   const isMobile = window.innerWidth < 768;
 
   // Real API calls
@@ -74,6 +387,12 @@ export default function Students() {
     }
   }, [clubs, selectedClub]);
 
+  // Handle view attendance
+  const handleViewAttendance = (student) => {
+    setSelectedStudent(student);
+    setAttendanceModalVisible(true);
+  };
+
   // Remove student from club
   const handleRemoveStudent = async (student) => {
     try {
@@ -85,7 +404,6 @@ export default function Students() {
       if (result.success) {
         message.success(`${student.full_name} to'garakdan chiqarildi`);
 
-        // Send notification (this would be handled by backend in real app)
         notification.info({
           message: "Student xabardor qilindi",
           description: `${student.full_name}ga to'garakdan chiqarilganligi haqida xabar yuborildi`,
@@ -93,7 +411,6 @@ export default function Students() {
           icon: <ExclamationCircleOutlined style={{ color: "#108ee9" }} />,
         });
 
-        // Refetch students list
         refetchStudents();
       }
     } catch (error) {
@@ -123,192 +440,6 @@ export default function Students() {
       (s) => (s.attendancePercentage || 0) >= 75
     ).length,
   };
-
-  // Desktop table columns
-  const columns = [
-    {
-      title: "Student",
-      key: "student",
-      fixed: isMobile ? false : "left",
-      width: isMobile ? 150 : 250,
-      render: (_, record) => (
-        <div className="flex items-center gap-3">
-          <Avatar
-            src={record.image}
-            icon={!record.image && <UserOutlined />}
-            size={isMobile ? "small" : "large"}
-            className="bg-purple-500"
-          />
-          <div className="min-w-0">
-            <Text className="font-medium block truncate">
-              {record.full_name}
-            </Text>
-            <Text className="block text-xs text-gray-500">
-              {record.student_id_number}
-            </Text>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Guruh",
-      dataIndex: ["group", "name"],
-      key: "group",
-      width: 120,
-      render: (text) => <Tag color="purple">{text}</Tag>,
-      responsive: ["md"],
-    },
-    {
-      title: "Fakultet",
-      dataIndex: ["department", "name"],
-      key: "department",
-      width: 150,
-      render: (text) => (
-        <Tag color="blue" className="truncate">
-          {text}
-        </Tag>
-      ),
-      responsive: ["lg"],
-    },
-    {
-      title: "Kontakt",
-      key: "contact",
-      width: 200,
-      render: (_, record) => (
-        <div className="space-y-1">
-          {record.phone && (
-            <div className="flex items-center gap-1 text-gray-600">
-              <PhoneOutlined className="text-xs" />
-              <Text className="text-xs sm:text-sm">
-                {formatPhoneNumber(record.phone)}
-              </Text>
-            </div>
-          )}
-          {record.email && (
-            <div className="flex items-center gap-1 text-gray-600">
-              <MailOutlined className="text-xs" />
-              <Text className="text-xs sm:text-sm truncate">
-                {record.email}
-              </Text>
-            </div>
-          )}
-        </div>
-      ),
-      responsive: ["lg"],
-    },
-    {
-      title: "Davomat",
-      key: "attendance",
-      width: 100,
-      render: (_, record) => {
-        const percentage = record.attendancePercentage || 0;
-        const color =
-          percentage >= 90 ? "success" : percentage >= 75 ? "warning" : "error";
-        return <Badge status={color} text={`${percentage}%`} />;
-      },
-    },
-    {
-      title: "Amal",
-      key: "action",
-      width: 100,
-      render: (_, record) => (
-        <Popconfirm
-          title="Studentni to'garakdan chiqarish"
-          description={`${record.full_name}ni to'garakdan chiqarishni tasdiqlaysizmi?`}
-          onConfirm={() => handleRemoveStudent(record)}
-          okText="Ha, chiqarish"
-          cancelText="Bekor qilish"
-          okButtonProps={{ danger: true, loading: removing }}
-        >
-          <Button type="text" danger icon={<DeleteOutlined />} size="small">
-            Chiqarish
-          </Button>
-        </Popconfirm>
-      ),
-    },
-  ];
-
-  // Mobile student card
-  const MobileStudentCard = ({ student }) => (
-    <Card className="mb-3 shadow-sm" bodyStyle={{ padding: "12px" }}>
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3 flex-1">
-          <Avatar
-            src={student.image}
-            icon={!student.image && <UserOutlined />}
-            size="large"
-            className="bg-purple-500"
-          />
-          <div className="flex-1 min-w-0">
-            <Text className="font-medium block">{student.full_name}</Text>
-            <Text className="text-xs text-gray-500">
-              {student.student_id_number}
-            </Text>
-            <div className="flex flex-wrap gap-1 mt-1">
-              <Tag color="purple" className="text-xs m-0">
-                {student.group?.name}
-              </Tag>
-              {student.attendancePercentage !== undefined && (
-                <Tag
-                  color={
-                    student.attendancePercentage >= 90
-                      ? "green"
-                      : student.attendancePercentage >= 75
-                      ? "orange"
-                      : "red"
-                  }
-                  className="text-xs m-0"
-                >
-                  {student.attendancePercentage}%
-                </Tag>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 pt-3 border-t space-y-2">
-        {(student.phone || student.email) && (
-          <div className="space-y-1">
-            {student.phone && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <PhoneOutlined className="text-xs" />
-                <Text className="text-xs">
-                  {formatPhoneNumber(student.phone)}
-                </Text>
-              </div>
-            )}
-            {student.email && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <MailOutlined className="text-xs" />
-                <Text className="text-xs truncate">{student.email}</Text>
-              </div>
-            )}
-          </div>
-        )}
-
-        <Popconfirm
-          title="Studentni chiqarish"
-          description={`${student.full_name}ni to'garakdan chiqarishni tasdiqlaysizmi?`}
-          onConfirm={() => handleRemoveStudent(student)}
-          okText="Ha"
-          cancelText="Yo'q"
-          okButtonProps={{ danger: true, loading: removing }}
-        >
-          <Button
-            type="primary"
-            danger
-            icon={<DeleteOutlined />}
-            loading={removing}
-            size="small"
-            block
-          >
-            To'garakdan chiqarish
-          </Button>
-        </Popconfirm>
-      </div>
-    </Card>
-  );
 
   // Filter drawer for mobile
   const FilterDrawer = () => (
@@ -353,7 +484,8 @@ export default function Students() {
   if (clubsLoading) return <LoadingSpinner size="large" />;
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <Title level={3} className="!text-xl sm:!text-2xl !mb-0">
           Studentlar
@@ -362,18 +494,15 @@ export default function Students() {
           <Button
             icon={<FilterOutlined />}
             onClick={() => setFilterDrawerVisible(true)}
-            className="lg:hidden"
           >
             Filtr
           </Button>
         )}
       </div>
 
+      {/* Filters Card */}
       <Card className="border-0 shadow-md">
-        {/* Desktop filters */}
-        <div
-          className={`${isMobile ? "space-y-3" : "flex gap-4"} mb-4 sm:mb-6`}
-        >
+        <div className={`${isMobile ? "space-y-3" : "flex gap-4"} mb-4`}>
           {!isMobile && (
             <Select
               placeholder="To'garakni tanlang"
@@ -385,97 +514,139 @@ export default function Students() {
             >
               {clubs.map((club) => (
                 <Select.Option key={club._id} value={club._id}>
-                  {club.name} ({club.totalStudents || 0} ta)
+                  <div className="flex items-center justify-between">
+                    <span>{club.name}</span>
+                    <Tag color="purple" size="small">
+                      {club.totalStudents || 0} ta
+                    </Tag>
+                  </div>
                 </Select.Option>
               ))}
             </Select>
           )}
 
           <Input
-            placeholder="Qidirish..."
+            placeholder="Student qidirish..."
             prefix={<SearchOutlined />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: isMobile ? "100%" : 250 }}
+            style={{ width: isMobile ? "100%" : 300 }}
             size="large"
+            allowClear
           />
+
+          {selectedClub && (
+            <div className="ml-auto flex items-center gap-2">
+              <Tag color="purple" className="m-0">
+                <BookOutlined className="mr-1" />
+                {clubs.find((c) => c._id === selectedClub)?.name}
+              </Tag>
+            </div>
+          )}
         </div>
 
-        {selectedClub ? (
-          <>
-            {/* Statistics cards */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        {/* Statistics Cards */}
+        {selectedClub && (
+          <Row gutter={[12, 12]} className="mb-6">
+            <Col xs={8} sm={8}>
               <Card
-                className="border border-purple-200 bg-purple-50"
-                bodyStyle={{ padding: "12px sm:padding" }}
+                className="text-center border border-purple-200 bg-purple-50"
+                bodyStyle={{ padding: isMobile ? "8px" : "16px" }}
               >
-                <div className="text-center">
-                  <Text className="text-gray-600 text-xs sm:text-sm">Jami</Text>
-                  <div className="text-xl sm:text-2xl font-bold text-purple-600 mt-1">
-                    {statistics.total}
-                  </div>
-                </div>
-              </Card>
-
-              <Card
-                className="border border-green-200 bg-green-50"
-                bodyStyle={{ padding: "12px sm:padding" }}
-              >
-                <div className="text-center">
-                  <Text className="text-gray-600 text-xs sm:text-sm">
-                    O'rtacha
-                  </Text>
-                  <div className="text-xl sm:text-2xl font-bold text-green-600 mt-1">
-                    {statistics.averageAttendance}%
-                  </div>
-                </div>
-              </Card>
-
-              <Card
-                className="border border-blue-200 bg-blue-50"
-                bodyStyle={{ padding: "12px sm:padding" }}
-              >
-                <div className="text-center">
-                  <Text className="text-gray-600 text-xs sm:text-sm">Faol</Text>
-                  <div className="text-xl sm:text-2xl font-bold text-blue-600 mt-1">
-                    {statistics.activeCount}
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Students list/table */}
-            {studentsLoading ? (
-              <Skeleton active paragraph={{ rows: 5 }} />
-            ) : filteredStudents.length > 0 ? (
-              isMobile ? (
-                <div className="max-h-[60vh] overflow-y-auto">
-                  {filteredStudents.map((student) => (
-                    <MobileStudentCard key={student._id} student={student} />
-                  ))}
-                </div>
-              ) : (
-                <Table
-                  columns={columns}
-                  dataSource={filteredStudents}
-                  rowKey="_id"
-                  pagination={{
-                    pageSize: 10,
-                    showSizeChanger: true,
-                    showTotal: (total) => `Jami: ${total} ta`,
-                    responsive: true,
+                <Statistic
+                  title={
+                    <Text className="text-xs sm:text-sm text-gray-600">
+                      Jami
+                    </Text>
+                  }
+                  value={statistics.total}
+                  valueStyle={{
+                    fontSize: isMobile ? 20 : 24,
+                    color: "#722ed1",
                   }}
-                  scroll={{ x: "max-content" }}
                 />
-              )
-            ) : (
-              <Empty description="Studentlar topilmadi" />
-            )}
-          </>
+              </Card>
+            </Col>
+            <Col xs={8} sm={8}>
+              <Card
+                className="text-center border border-green-200 bg-green-50"
+                bodyStyle={{ padding: isMobile ? "8px" : "16px" }}
+              >
+                <Statistic
+                  title={
+                    <Text className="text-xs sm:text-sm text-gray-600">
+                      O'rtacha
+                    </Text>
+                  }
+                  value={statistics.averageAttendance}
+                  suffix="%"
+                  valueStyle={{
+                    fontSize: isMobile ? 20 : 24,
+                    color: "#52c41a",
+                  }}
+                />
+              </Card>
+            </Col>
+            <Col xs={8} sm={8}>
+              <Card
+                className="text-center border border-blue-200 bg-blue-50"
+                bodyStyle={{ padding: isMobile ? "8px" : "16px" }}
+              >
+                <Statistic
+                  title={
+                    <Text className="text-xs sm:text-sm text-gray-600">
+                      Faol
+                    </Text>
+                  }
+                  value={statistics.activeCount}
+                  valueStyle={{
+                    fontSize: isMobile ? 20 : 24,
+                    color: "#1890ff",
+                  }}
+                />
+              </Card>
+            </Col>
+          </Row>
+        )}
+
+        {/* Students Grid */}
+        {selectedClub ? (
+          studentsLoading ? (
+            <Row gutter={[16, 16]}>
+              {[...Array(6)].map((_, i) => (
+                <Col xs={24} sm={24} md={12} lg={12} xl={12} key={i}>
+                  <Card loading={true} />
+                </Col>
+              ))}
+            </Row>
+          ) : filteredStudents.length > 0 ? (
+            <Row gutter={[16, 16]} className="animate-fade-in">
+              {filteredStudents.map((student) => (
+                <Col xs={24} sm={24} md={12} lg={12} xl={12} key={student._id}>
+                  <StudentCard
+                    student={student}
+                    onRemove={handleRemoveStudent}
+                    onViewAttendance={handleViewAttendance}
+                    removing={removing}
+                    isMobile={isMobile}
+                  />
+                </Col>
+              ))}
+            </Row>
+          ) : (
+            <Empty
+              description={
+                searchText
+                  ? "Izlangan student topilmadi"
+                  : "Bu to'garakda studentlar yo'q"
+              }
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            />
+          )
         ) : (
-          <div className="text-center py-8 sm:py-12">
-            <UserOutlined className="text-3xl sm:text-4xl mb-4 text-gray-300" />
-            <Text className="text-gray-500">
+          <div className="text-center py-12">
+            <TeamOutlined className="text-4xl mb-4 text-gray-300" />
+            <Text className="text-gray-500 block">
               {isMobile
                 ? "Filtr tugmasini bosing va to'garak tanlang"
                 : "To'garakni tanlang"}
@@ -484,6 +655,18 @@ export default function Students() {
         )}
       </Card>
 
+      {/* Attendance Modal */}
+      <StudentAttendanceModal
+        visible={attendanceModalVisible}
+        onClose={() => {
+          setAttendanceModalVisible(false);
+          setSelectedStudent(null);
+        }}
+        student={selectedStudent}
+        clubId={selectedClub}
+      />
+
+      {/* Mobile Filter Drawer */}
       {isMobile && <FilterDrawer />}
     </div>
   );
