@@ -1,92 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  @apply bg-gray-100;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-gray-400 rounded-full;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
-}
-
-/* Loading animation */
-.loading-spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Glass morphism effect */
-.glass {
-  @apply backdrop-blur-md bg-white/80 border border-gray-200/50;
-}
-
-/* Card hover effects */
-.card-hover {
-  @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
-}
-
-/* Animations */
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
-}
-
-.animate-slide-in {
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(-20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/* Custom tabs styling */
-.custom-tabs .ant-tabs-tab {
-  @apply font-medium;
-}
-
-.custom-tabs .ant-tabs-tab-active {
-  @apply text-purple-600;
-}
-
-.custom-tabs .ant-tabs-ink-bar {
-  @apply bg-purple-600;
-}
-
-/* ============ CALENDAR CUSTOM STYLES ============ */
+/* Custom Calendar Styles for Attendance Page */
 
 /* Reduce calendar cell height */
 .custom-calendar .ant-picker-calendar-date {
@@ -94,7 +6,6 @@
   margin: 2px !important;
   padding: 4px !important;
   transition: all 0.3s ease;
-  cursor: pointer;
 }
 
 .custom-calendar .ant-picker-calendar-date-content {
@@ -108,7 +19,7 @@
 /* Hover effect for calendar cells */
 .custom-calendar .ant-picker-calendar-date:hover {
   background-color: #f0f2f5;
-  transform: scale(1.02);
+  cursor: pointer;
 }
 
 /* Today's date highlight */
@@ -136,7 +47,10 @@
 
 /* Badge styling in calendar cells */
 .custom-calendar .ant-badge {
-  font-size: 11px !important;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .custom-calendar .ant-badge-count {
@@ -148,7 +62,25 @@
   border-radius: 10px !important;
 }
 
-/* Mobile responsive calendar */
+/* Plus icon for empty dates */
+.custom-calendar .attendance-add-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #e6e6e6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.custom-calendar .attendance-add-icon:hover {
+  background-color: #722ed1;
+  color: white;
+  transform: scale(1.1);
+}
+
+/* Mobile responsive adjustments */
 @media (max-width: 768px) {
   .custom-calendar .ant-picker-calendar-date {
     height: 50px !important;
@@ -168,6 +100,43 @@
   }
 }
 
+/* View Attendance Modal Styles */
+.attendance-modal .ant-modal-body {
+  padding: 24px;
+}
+
+.attendance-modal .ant-statistic-title {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 4px;
+}
+
+.attendance-modal .ant-statistic-content-value {
+  font-size: 20px !important;
+}
+
+/* Student attendance timeline */
+.attendance-timeline .ant-timeline-item-tail {
+  border-left-style: dashed;
+}
+
+.attendance-timeline .ant-timeline-item-head {
+  background-color: transparent;
+}
+
+/* Attendance list hover effect */
+.attendance-list-item {
+  transition: all 0.3s ease;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.attendance-list-item:hover {
+  background-color: #f0f2f5;
+  transform: translateX(4px);
+}
+
 /* Required field indicator */
 .required-field::after {
   content: " *";
@@ -175,21 +144,31 @@
   font-weight: bold;
 }
 
-/* Telegram link input error state */
-input[status="error"] {
+/* Telegram link input styling */
+.telegram-input-error {
   border-color: #ff4d4f !important;
 }
 
-input[status="error"]:focus {
+.telegram-input-error:focus,
+.telegram-input-error:hover {
   border-color: #ff7875 !important;
   box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2);
 }
 
-/* Attendance Modal animations */
-.attendance-modal .ant-modal-content {
-  animation: modalSlideIn 0.3s ease-out;
+/* Success/Error badge colors */
+.attendance-badge-success {
+  background-color: #52c41a !important;
 }
 
+.attendance-badge-warning {
+  background-color: #faad14 !important;
+}
+
+.attendance-badge-error {
+  background-color: #f5222d !important;
+}
+
+/* Animation for modal open */
 @keyframes modalSlideIn {
   from {
     opacity: 0;
@@ -201,17 +180,26 @@ input[status="error"]:focus {
   }
 }
 
-/* Student attendance timeline */
-.attendance-modal .ant-timeline-item-tail {
-  border-left-style: dashed;
+.ant-modal-content {
+  animation: modalSlideIn 0.3s ease-out;
 }
 
-/* Clickable list items */
-.attendance-list-item {
-  transition: all 0.2s ease;
+/* Student card hover effects */
+.student-attendance-card {
+  transition: all 0.3s ease;
+  border: 1px solid #f0f0f0;
 }
 
-.attendance-list-item:hover {
-  background-color: #f5f5f5;
-  transform: translateX(2px);
+.student-attendance-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #d9d9d9;
+}
+
+/* Progress bar custom colors */
+.attendance-progress .ant-progress-inner {
+  background-color: #f0f0f0 !important;
+}
+
+.attendance-progress .ant-progress-bg {
+  background: linear-gradient(90deg, #108ee9 0%, #87d068 100%) !important;
 }

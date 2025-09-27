@@ -128,6 +128,21 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
       return;
     }
 
+    // Telegram link required check
+    if (!telegramPostLink.trim()) {
+      message.error("Telegram post linki kiritilishi shart!");
+      return;
+    }
+
+    // Validate telegram link format
+    if (
+      !telegramPostLink.includes("t.me/") &&
+      !telegramPostLink.includes("telegram.me/")
+    ) {
+      message.warning("Telegram link formati noto'g'ri!");
+      return;
+    }
+
     try {
       const attendanceData = {
         clubId: club._id,
@@ -138,7 +153,7 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
           reason: s.reason || null,
         })),
         notes: notes.trim() || null,
-        telegramPostLink: telegramPostLink.trim() || null,
+        telegramPostLink: telegramPostLink.trim(),
       };
 
       const result = await markAttendance(attendanceData).unwrap();
@@ -174,7 +189,7 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
   const MobileStudentCard = ({ student }) => (
     <Card className="mb-3 shadow-sm" bodyStyle={{ padding: "12px" }}>
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <Avatar
               src={student.image}
@@ -330,13 +345,21 @@ export default function AttendanceModal({ visible, onClose, club, date }) {
 
       <div className="mt-6 space-y-4">
         <div>
-          <Text className="block mb-2">Telegram post linki:</Text>
+          <Text className="block mb-2">
+            Telegram post linki: <span className="text-red-500">*</span>
+          </Text>
           <Input
             placeholder="https://t.me/channel/123"
             value={telegramPostLink}
             onChange={(e) => setTelegramPostLink(e.target.value)}
             disabled={existingAttendance?.data}
+            status={telegramPostLink.trim() === "" ? "error" : ""}
           />
+          {telegramPostLink.trim() === "" && (
+            <Text className="text-red-500 text-xs mt-1">
+              Telegram post linki majburiy!
+            </Text>
+          )}
         </div>
 
         <div>

@@ -47,11 +47,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         </span>
       ),
     },
-    {
-      key: "/attendance",
-      icon: <CalendarOutlined />,
-      label: "Davomat",
-    },
+
     {
       key: "/students",
       icon: <TeamOutlined />,

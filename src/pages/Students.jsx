@@ -49,6 +49,12 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import { formatPhoneNumber } from "../utils/helpers";
 import { useLocation } from "react-router-dom";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+import "dayjs/locale/uz";
+
+// Configure dayjs
+dayjs.extend(customParseFormat);
+dayjs.locale("uz");
 
 const { Title, Text } = Typography;
 
@@ -75,6 +81,44 @@ const StudentAttendanceModal = ({ visible, onClose, student, clubId }) => {
     ) : (
       <CloseCircleOutlined style={{ color: "#f5222d" }} />
     );
+  };
+
+  // Helper function to parse and format date
+  const parseAndFormatDate = (dateStr) => {
+    if (!dateStr) return { formatted: "Noma'lum sana", dayName: "" };
+
+    // If date is already in DD.MM.YYYY format (string from API)
+    if (typeof dateStr === "string" && dateStr.includes(".")) {
+      const parts = dateStr.split(".");
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        // Create a valid date for dayjs
+        const parsedDate = dayjs(
+          `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`,
+          "YYYY-MM-DD"
+        );
+
+        if (parsedDate.isValid()) {
+          return {
+            formatted: dateStr, // Keep original format
+            dayName: parsedDate.format("dddd"),
+          };
+        }
+      }
+      return { formatted: dateStr, dayName: "" };
+    }
+
+    // Try to parse as ISO or other format
+    const parsed = dayjs(dateStr);
+    if (parsed.isValid()) {
+      return {
+        formatted: parsed.format("DD.MM.YYYY"),
+        dayName: parsed.format("dddd"),
+      };
+    }
+
+    // If still invalid, return the original string
+    return { formatted: dateStr || "Noma'lum sana", dayName: "" };
   };
 
   return (
@@ -171,52 +215,62 @@ const StudentAttendanceModal = ({ visible, onClose, student, clubId }) => {
             />
           </div>
 
-          {/* Attendance Timeline - ENLARGED */}
+          {/* Attendance Timeline */}
           <div className="border rounded-lg p-4 bg-white">
             <Text className="font-semibold text-lg mb-4 block">
               Davomat tarixi
             </Text>
             {attendance.length > 0 ? (
               <div
-                className="overflow-y-auto pr-3"
+                className="overflow-y-auto p-3"
                 style={{
                   maxHeight: "450px",
                   minHeight: "350px",
                 }}
               >
                 <Timeline
-                  items={attendance.map((record) => ({
-                    dot: getAttendanceIcon(record.present),
-                    color: getAttendanceColor(record.present),
-                    children: (
-                      <div className="pb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <Text className="font-medium text-base">
-                            {dayjs(record.date).format("DD.MM.YYYY")}
-                          </Text>
-                          <Tag
-                            color={record.present ? "success" : "error"}
-                            icon={getAttendanceIcon(record.present)}
-                            className="text-sm px-3 py-1"
-                          >
-                            {record.present ? "Kelgan" : "Kelmagan"}
-                          </Tag>
-                        </div>
-                        <Text className="text-sm text-gray-500">
-                          {dayjs(record.date).format("dddd")}
-                        </Text>
-                        {record.reason && (
-                          <div className="mt-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                            <Text className="text-sm">
-                              <InfoCircleOutlined className="mr-2 text-orange-500" />
-                              <span className="font-medium">Sababi:</span>{" "}
-                              {record.reason}
-                            </Text>
+                  items={attendance.map((record) => {
+                    const dateInfo = parseAndFormatDate(
+                      record.date || record.formattedDate || record.originalDate
+                    );
+
+                    return {
+                      dot: getAttendanceIcon(record.present),
+                      color: getAttendanceColor(record.present),
+                      children: (
+                        <div className="pb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <Text className="font-medium text-base block">
+                                {dateInfo.formatted}
+                              </Text>
+                              {dateInfo.dayName && (
+                                <Text className="text-sm text-gray-500">
+                                  {dateInfo.dayName}
+                                </Text>
+                              )}
+                            </div>
+                            <Tag
+                              color={record.present ? "success" : "error"}
+                              icon={getAttendanceIcon(record.present)}
+                              className="text-sm px-3 py-1"
+                            >
+                              {record.present ? "Kelgan" : "Kelmagan"}
+                            </Tag>
                           </div>
-                        )}
-                      </div>
-                    ),
-                  }))}
+                          {record.reason && (
+                            <div className="mt-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                              <Text className="text-sm">
+                                <InfoCircleOutlined className="mr-2 text-orange-500" />
+                                <span className="font-medium">Sababi:</span>{" "}
+                                {record.reason}
+                              </Text>
+                            </div>
+                          )}
+                        </div>
+                      ),
+                    };
+                  })}
                 />
               </div>
             ) : (
@@ -351,6 +405,58 @@ const StudentCard = ({
   );
 };
 
+// Filter Drawer Component for Mobile
+const FilterDrawer = ({
+  visible,
+  onClose,
+  clubs,
+  selectedClub,
+  setSelectedClub,
+  clubsLoading,
+}) => (
+  <Drawer
+    title="Filtrlar"
+    placement="bottom"
+    open={visible}
+    onClose={onClose}
+    height="auto"
+  >
+    <div className="space-y-4">
+      <div>
+        <Text className="block mb-2">To'garak tanlang</Text>
+        <Select
+          placeholder="To'garakni tanlang"
+          style={{ width: "100%" }}
+          value={selectedClub}
+          onChange={setSelectedClub}
+          size="large"
+          loading={clubsLoading}
+        >
+          {clubs.map((club) => (
+            <Select.Option key={club._id} value={club._id}>
+              <div className="flex items-center justify-between">
+                <span>{club.name}</span>
+                <Tag color="purple" size="small">
+                  {club.totalStudents || 0} ta
+                </Tag>
+              </div>
+            </Select.Option>
+          ))}
+        </Select>
+      </div>
+
+      <Button
+        type="primary"
+        block
+        onClick={onClose}
+        className="bg-purple-600 border-0"
+      >
+        Qo'llash
+      </Button>
+    </div>
+  </Drawer>
+);
+
 // Main Students Component
 export default function Students() {
   const location = useLocation();
@@ -440,46 +546,6 @@ export default function Students() {
       (s) => (s.attendancePercentage || 0) >= 75
     ).length,
   };
-
-  // Filter drawer for mobile
-  const FilterDrawer = () => (
-    <Drawer
-      title="Filtrlar"
-      placement="bottom"
-      open={filterDrawerVisible}
-      onClose={() => setFilterDrawerVisible(false)}
-      height="auto"
-    >
-      <div className="space-y-4">
-        <div>
-          <Text className="block mb-2">To'garak tanlang</Text>
-          <Select
-            placeholder="To'garakni tanlang"
-            style={{ width: "100%" }}
-            value={selectedClub}
-            onChange={setSelectedClub}
-            size="large"
-            loading={clubsLoading}
-          >
-            {clubs.map((club) => (
-              <Select.Option key={club._id} value={club._id}>
-                {club.name} ({club.totalStudents || 0} ta)
-              </Select.Option>
-            ))}
-          </Select>
-        </div>
-
-        <Button
-          type="primary"
-          block
-          onClick={() => setFilterDrawerVisible(false)}
-          className="bg-purple-600 border-0"
-        >
-          Qo'llash
-        </Button>
-      </div>
-    </Drawer>
-  );
 
   if (clubsLoading) return <LoadingSpinner size="large" />;
 
@@ -667,7 +733,16 @@ export default function Students() {
       />
 
       {/* Mobile Filter Drawer */}
-      {isMobile && <FilterDrawer />}
+      {isMobile && (
+        <FilterDrawer
+          visible={filterDrawerVisible}
+          onClose={() => setFilterDrawerVisible(false)}
+          clubs={clubs}
+          selectedClub={selectedClub}
+          setSelectedClub={setSelectedClub}
+          clubsLoading={clubsLoading}
+        />
+      )}
     </div>
   );
 }

@@ -15,6 +15,9 @@ import {
   message,
   Tooltip,
   Statistic,
+  Modal,
+  Badge,
+  Divider,
 } from "antd";
 import {
   PlusOutlined,
@@ -25,6 +28,8 @@ import {
   CloseCircleOutlined,
   EditOutlined,
   BarChartOutlined,
+  EyeOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import {
   useGetMyClubsQuery,
@@ -37,11 +42,155 @@ import { useLocation } from "react-router-dom";
 
 const { Title, Text } = Typography;
 
+// View Attendance Modal Component
+const ViewAttendanceModal = ({ visible, onClose, attendance, club, date }) => {
+  if (!attendance) return null;
+
+  const presentCount =
+    attendance.students?.filter((s) => s.present).length || 0;
+  const totalCount = attendance.students?.length || 0;
+  const percentage =
+    totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 0;
+
+  return (
+    <Modal
+      title={
+        <div>
+          <Text className="text-lg font-medium">Davomat ko'rish</Text>
+          <div className="text-sm text-gray-500 mt-1">
+            {club?.name} - {date?.format("DD.MM.YYYY")}
+          </div>
+        </div>
+      }
+      open={visible}
+      onCancel={onClose}
+      width={800}
+      footer={[
+        <Button key="close" type="primary" onClick={onClose}>
+          Yopish
+        </Button>,
+      ]}
+    >
+      <div className="space-y-4">
+        {/* Statistics */}
+        <Row gutter={[12, 12]}>
+          <Col span={8}>
+            <Card className="text-center bg-green-50 border-0">
+              <Statistic
+                title="Kelgan"
+                value={presentCount}
+                prefix={<CheckCircleOutlined />}
+                valueStyle={{ color: "#52c41a", fontSize: 20 }}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card className="text-center bg-red-50 border-0">
+              <Statistic
+                title="Kelmagan"
+                value={totalCount - presentCount}
+                prefix={<CloseCircleOutlined />}
+                valueStyle={{ color: "#f5222d", fontSize: 20 }}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card className="text-center bg-blue-50 border-0">
+              <Statistic
+                title="Davomat"
+                value={percentage}
+                suffix="%"
+                valueStyle={{ color: "#1890ff", fontSize: 20 }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Students List */}
+        <Card title="Studentlar ro'yxati" className="border-0">
+          <List
+            dataSource={attendance.students || []}
+            renderItem={(item) => (
+              <List.Item>
+                <div className="w-full flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar
+                      src={item.student?.image}
+                      icon={!item.student?.image && <UserOutlined />}
+                      className="bg-purple-500"
+                    />
+                    <div>
+                      <Text className="font-medium block">
+                        {item.student?.full_name || "Noma'lum"}
+                      </Text>
+                      <Text className="text-xs text-gray-500">
+                        {item.student?.student_id_number || "-"}
+                      </Text>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {item.reason && (
+                      <Tag color="orange" className="m-0">
+                        {item.reason}
+                      </Tag>
+                    )}
+                    <Tag
+                      color={item.present ? "success" : "error"}
+                      icon={
+                        item.present ? (
+                          <CheckCircleOutlined />
+                        ) : (
+                          <CloseCircleOutlined />
+                        )
+                      }
+                    >
+                      {item.present ? "Kelgan" : "Kelmagan"}
+                    </Tag>
+                  </div>
+                </div>
+              </List.Item>
+            )}
+          />
+        </Card>
+
+        {/* Additional Info */}
+        {(attendance.notes || attendance.telegramPostLink) && (
+          <Card title="Qo'shimcha ma'lumotlar" className="border-0">
+            {attendance.telegramPostLink && (
+              <div className="mb-3">
+                <Text className="text-gray-500">Telegram post:</Text>
+                <br />
+                <a
+                  href={attendance.telegramPostLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600"
+                >
+                  {attendance.telegramPostLink}
+                </a>
+              </div>
+            )}
+            {attendance.notes && (
+              <div>
+                <Text className="text-gray-500">Izoh:</Text>
+                <br />
+                <Text>{attendance.notes}</Text>
+              </div>
+            )}
+          </Card>
+        )}
+      </div>
+    </Modal>
+  );
+};
+
 export default function Attendance() {
   const location = useLocation();
   const [selectedClub, setSelectedClub] = useState(null);
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [attendanceModalVisible, setAttendanceModalVisible] = useState(false);
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [selectedAttendance, setSelectedAttendance] = useState(null);
   const [dateRange, setDateRange] = useState({
     startDate: dayjs().startOf("month").format("YYYY-MM-DD"),
     endDate: dayjs().endOf("month").format("YYYY-MM-DD"),
@@ -78,8 +227,32 @@ export default function Attendance() {
     }
   }, [clubs, location.state, selectedClub]);
 
-  const handleDateSelect = (date) => {
+  // Calendar cell click handler
+  const handleDateCellClick = (date) => {
     setSelectedDate(date);
+
+    if (!selectedClub) {
+      message.warning("Avval to'garakni tanlang");
+      return;
+    }
+
+    // Check if attendance exists for this date
+    const existingAttendance = attendanceHistory.find((a) =>
+      dayjs(a.date).isSame(date, "day")
+    );
+
+    if (existingAttendance) {
+      // Show view modal if attendance exists
+      setSelectedAttendance(existingAttendance);
+      setViewModalVisible(true);
+    } else {
+      // Show mark attendance modal if no attendance
+      if (date.isAfter(dayjs(), "day")) {
+        message.warning("Kelajakdagi sanalar uchun davomat kiritib bo'lmaydi");
+        return;
+      }
+      setAttendanceModalVisible(true);
+    }
   };
 
   const handleMarkAttendance = () => {
@@ -92,7 +265,6 @@ export default function Attendance() {
       return;
     }
 
-    // Bugungi sanadan kechikkan sanani tanlab bo'lmaydi
     if (selectedDate.isAfter(dayjs(), "day")) {
       message.warning("Kelajakdagi sanalar uchun davomat kiritib bo'lmaydi");
       return;
@@ -111,11 +283,15 @@ export default function Attendance() {
 
   const selectedClubData = clubs.find((club) => club._id === selectedClub);
 
-  // Calendar cell renderer
+  // Calendar cell renderer - Compact version
   const dateCellRender = (value) => {
     const attendanceForDate = attendanceHistory.find((a) =>
       dayjs(a.date).isSame(value, "day")
     );
+
+    const isPast = value.isBefore(dayjs(), "day");
+    const isToday = value.isSame(dayjs(), "day");
+    const isFuture = value.isAfter(dayjs(), "day");
 
     if (attendanceForDate) {
       const presentCount = attendanceForDate.students.filter(
@@ -130,13 +306,47 @@ export default function Attendance() {
       else color = "error";
 
       return (
-        <div className="text-center">
-          <Tag color={color} size="small">
-            {percentage.toFixed(0)}%
-          </Tag>
+        <div
+          className="h-full w-full flex items-center justify-center cursor-pointer hover:bg-gray-50"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDateCellClick(value);
+          }}
+        >
+          <Badge
+            count={`${percentage.toFixed(0)}%`}
+            style={{
+              backgroundColor:
+                color === "success"
+                  ? "#52c41a"
+                  : color === "warning"
+                  ? "#faad14"
+                  : "#f5222d",
+            }}
+          />
         </div>
       );
     }
+
+    // Show clickable indicator for dates without attendance
+    if (isPast || isToday) {
+      return (
+        <div
+          className="h-full w-full flex items-center justify-center cursor-pointer hover:bg-blue-50"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDateCellClick(value);
+          }}
+        >
+          <Tooltip title="Davomat kiritish">
+            <div className="w-6 h-6 rounded-full bg-gray-200 hover:bg-blue-200 flex items-center justify-center">
+              <PlusOutlined className="text-xs text-gray-600" />
+            </div>
+          </Tooltip>
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -324,7 +534,7 @@ export default function Attendance() {
                       </Text>
                     </div>
                     <div className="flex items-center gap-2">
-                      <UserOutlined className="text-gray-400" />
+                      <TeamOutlined className="text-gray-400" />
                       <Text>{selectedClubData.totalStudents || 0} student</Text>
                     </div>
                   </div>
@@ -336,14 +546,34 @@ export default function Attendance() {
               <Text className="block mb-2 font-medium">
                 Tanlangan sana: {selectedDate.format("DD.MM.YYYY")}
               </Text>
+              <Text className="text-sm text-gray-500">
+                Davomat kiritish yoki ko'rish uchun kalendardagi sanani bosing
+              </Text>
             </div>
 
             <Calendar
               value={selectedDate}
-              onSelect={handleDateSelect}
+              onSelect={setSelectedDate}
               dateCellRender={dateCellRender}
-              className="border rounded-lg"
+              className="border rounded-lg custom-calendar"
+              onPanelChange={(date) => {
+                setDateRange({
+                  startDate: date.startOf("month").format("YYYY-MM-DD"),
+                  endDate: date.endOf("month").format("YYYY-MM-DD"),
+                });
+              }}
             />
+
+            <style jsx>{`
+              .custom-calendar .ant-picker-calendar-date {
+                height: 60px !important;
+                margin: 2px !important;
+                padding: 4px !important;
+              }
+              .custom-calendar .ant-picker-calendar-date-content {
+                height: 50px !important;
+              }
+            `}</style>
           </Card>
         </Col>
 
@@ -355,7 +585,7 @@ export default function Attendance() {
             extra={
               attendanceHistory.length > 0 && (
                 <Text className="text-sm text-gray-500">
-                  So'nggi {attendanceHistory.length} ta mashg'ulot
+                  So'nggi {attendanceHistory.length} ta
                 </Text>
               )
             }
@@ -364,7 +594,7 @@ export default function Attendance() {
               <LoadingSpinner size="small" />
             ) : attendanceHistory.length > 0 ? (
               <List
-                dataSource={attendanceHistory}
+                dataSource={attendanceHistory.slice(0, 10)}
                 renderItem={(item) => {
                   const presentCount = item.students.filter(
                     (s) => s.present
@@ -374,7 +604,13 @@ export default function Attendance() {
                     totalCount > 0 ? (presentCount / totalCount) * 100 : 0;
 
                   return (
-                    <List.Item className="border-0 px-0">
+                    <List.Item
+                      className="border-0 px-0 cursor-pointer hover:bg-gray-50"
+                      onClick={() => {
+                        setSelectedAttendance(item);
+                        setViewModalVisible(true);
+                      }}
+                    >
                       <div className="w-full">
                         <div className="flex justify-between items-start mb-2">
                           <div>
@@ -385,17 +621,29 @@ export default function Attendance() {
                               {dayjs(item.date).format("dddd")}
                             </Text>
                           </div>
-                          <Tag
-                            color={
-                              percentage >= 90
-                                ? "success"
-                                : percentage >= 75
-                                ? "warning"
-                                : "error"
-                            }
-                          >
-                            {percentage.toFixed(1)}%
-                          </Tag>
+                          <Space>
+                            <Tag
+                              color={
+                                percentage >= 90
+                                  ? "success"
+                                  : percentage >= 75
+                                  ? "warning"
+                                  : "error"
+                              }
+                            >
+                              {percentage.toFixed(1)}%
+                            </Tag>
+                            <Button
+                              type="text"
+                              icon={<EyeOutlined />}
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedAttendance(item);
+                                setViewModalVisible(true);
+                              }}
+                            />
+                          </Space>
                         </div>
 
                         <div className="flex justify-between items-center text-sm">
@@ -414,7 +662,7 @@ export default function Attendance() {
                         </div>
 
                         {item.notes && (
-                          <Text className="text-xs text-gray-500 mt-2 block">
+                          <Text className="text-xs text-gray-500 mt-2 block truncate">
                             {item.notes}
                           </Text>
                         )}
@@ -442,6 +690,18 @@ export default function Attendance() {
       <AttendanceModal
         visible={attendanceModalVisible}
         onClose={handleCloseModal}
+        club={selectedClubData}
+        date={selectedDate}
+      />
+
+      {/* View Attendance Modal */}
+      <ViewAttendanceModal
+        visible={viewModalVisible}
+        onClose={() => {
+          setViewModalVisible(false);
+          setSelectedAttendance(null);
+        }}
+        attendance={selectedAttendance}
         club={selectedClubData}
         date={selectedDate}
       />
