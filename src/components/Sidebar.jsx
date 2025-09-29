@@ -137,7 +137,14 @@ export default function Sidebar({ collapsed, setCollapsed }) {
             collapsed ? "text-xl" : "text-2xl"
           }`}
         >
-          {collapsed ? "OP" : "O'qituvchi Panel"}
+          {collapsed ? (
+            "OP"
+          ) : (
+            <div className="flex items-center justify-start gap-2">
+              <img src={logo} className="w-[50px] " alt="" />
+              <p>Teacher panel</p>
+            </div>
+          )}
         </h1>
       </div>
 
