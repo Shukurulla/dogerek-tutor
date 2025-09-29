@@ -12,6 +12,7 @@ import {
   CloseOutlined,
 } from "@ant-design/icons";
 import { useGetApplicationsQuery } from "../store/api/tutorApi";
+import { logo } from "../../public";
 
 const { Sider } = Layout;
 const { useBreakpoint } = Grid;
@@ -89,9 +90,10 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         <Drawer
           title={
             <div className="flex items-center justify-between">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                O'qituvchi Panel
-              </h1>
+              <div className="flex items-center justify-start gap-2">
+                <img src={logo} className="w-[50px] " alt="" />
+                <p>Teacher panel</p>
+              </div>
             </div>
           }
           placement="left"
